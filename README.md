@@ -52,4 +52,15 @@ Push a `main` → deploy automático en Vercel.
 
 ## Estructura
 
-Ver `Setup_Tecnico_Inicial.md` y `Requisitos_WebApp_Quiz_Examenes.md` para los detalles de arquitectura, modelo de datos y plan de fases.
+El código vive bajo `src/` siguiendo las convenciones del App Router de Next.js:
+
+| Ruta | Descripción |
+| --- | --- |
+| `src/app/(auth)/login` | Pantalla de login |
+| `src/app/(app)` | Rutas protegidas (home, asignaturas, test, histórico, configuración, admin) |
+| `src/app/api/auth` | Endpoints de login/logout |
+| `src/proxy.ts` | Protección de rutas (Next.js 16 — antes `middleware.ts`) |
+| `src/components/ui` | Primitivos de UI reutilizables |
+| `src/components/test` | Componentes específicos del flujo de test |
+| `src/lib` | Cliente Supabase, auth, queries, scoring |
+| `src/types` | Tipos compartidos |
