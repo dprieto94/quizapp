@@ -46,3 +46,6 @@ next-env.d.ts
 
 # Claude Code local config
 .claude/
+
+# UI playground (no se commitea, vive solo en local)
+src/app/dev-ui/

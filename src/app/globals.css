@@ -1,13 +1,54 @@
 @import "tailwindcss";
 
+/* -----------------------------------------------------------------------------
+   QuizApp — Sistema de diseño (constitución)
+   -----------------------------------------------------------------------------
+   Mood: verde sereno y sofisticado, máster universitario (no Duolingo vivo).
+   Mobile-first, holgado, foco en legibilidad y feedback semántico inequívoco.
+
+   Decisiones cerradas (Fase 3 — Paso 1.2):
+   1. Radius: rounded-lg (8 px) por defecto; rounded-xl (12 px) en cards grandes
+      y modales.
+   2. Sombras: shadow-sm "flat" para todo en admin/forms. Reservar relieve
+      tipo Duolingo (sombra inferior 0 3px 0 var(--primary-hover)) SOLO al
+      botón "Empezar test" del flujo principal — único toque de personalidad.
+   3. Tipografía de números (timer, nota, contadores): font-sans con
+      `tabular-nums` — mejor cohesión que mono y dígitos alineados.
+   4. Densidad: HOLGADA. Padding generoso, line-height ≥ 1.5, targets táctiles
+      ≥ 44 px. La usuaria viene a leer-pensar-elegir, no a scrollear deprisa.
+
+   Tema único claro. NO hay modo oscuro (decisión de producto, ver
+   Doc_Funcional.md §12.1).
+   ---------------------------------------------------------------------------- */
+
 :root {
   --background: #ffffff;
-  --foreground: #171717;
+  --foreground: #18181b;       /* zinc-900 */
+  --muted: #71717a;            /* zinc-500 */
+  --border: #e4e4e7;           /* zinc-200 */
+  --primary: #059669;          /* emerald-600 */
+  --primary-hover: #047857;    /* emerald-700 */
+  --primary-soft: #ecfdf5;     /* emerald-50 */
+  --primary-light: #d1fae5;    /* emerald-100 */
+  --success: #10b981;          /* emerald-500 */
+  --danger: #ef4444;           /* red-500 */
+  --warning: #fbbf24;          /* amber-400 */
+  --neutral: #d4d4d8;          /* zinc-300 */
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-soft: var(--primary-soft);
+  --color-primary-light: var(--primary-light);
+  --color-success: var(--success);
+  --color-danger: var(--danger);
+  --color-warning: var(--warning);
+  --color-neutral: var(--neutral);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
@@ -15,5 +56,10 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+/* <Modal/> usa el <dialog> nativo: backdrop semitransparente uniforme. */
+dialog::backdrop {
+  background: rgba(0, 0, 0, 0.4);
 }
