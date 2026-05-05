@@ -49,3 +49,6 @@ next-env.d.ts
 
 # UI playground (no se commitea, vive solo en local)
 src/app/dev-ui/
+
+# Data smoke test (no se commitea, vive solo en local)
+src/app/dev-data/
