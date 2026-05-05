@@ -98,3 +98,30 @@ export type PreguntaFilters = {
   temaId?: string;
   q?: string;
 };
+
+export type PreguntaPublica = Omit<Pregunta, "correcta" | "created_at">;
+
+export type RespuestaEntrega = {
+  pregunta_id: string;
+  opcion_marcada: Opcion | null;
+  fue_dudosa: boolean;
+  orden: number;
+};
+
+export type CreateTestWithRespuestasInput = Omit<Test, "id" | "fecha"> & {
+  respuestas: RespuestaEntrega[];
+};
+
+export type CorrectaPregunta = Pick<Pregunta, "id" | "tema_id" | "correcta"> & {
+  asignatura_id: string;
+};
+
+export type TestRespuestaDetalle = TestRespuesta & {
+  pregunta: Pregunta;
+};
+
+export type TestDetalle = Test & {
+  asignatura_nombre: string;
+  tema_nombre: string | null;
+  respuestas: TestRespuestaDetalle[];
+};

@@ -19,18 +19,33 @@ import type {
   AsignaturaWithCounts,
   Config,
   ConfigUpdate,
+  CorrectaPregunta,
+  CreateTestWithRespuestasInput,
   NewAsignatura,
   NewPregunta,
   NewTema,
+  Pregunta,
   PreguntaFilters,
   PreguntaWithContext,
   Tema,
   TemaWithAsignatura,
   TemaWithCounts,
+  Test,
+  TestDetalle,
+  TestRespuestaDetalle,
   UpdateAsignatura,
   UpdatePregunta,
   UpdateTema,
 } from "@/types";
+
+function shuffled<T>(items: T[]): T[] {
+  const copy = [...items];
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
+}
 
 export async function listAsignaturas(): Promise<Asignatura[]> {
   const supabase = getSupabaseAdmin();
@@ -405,4 +420,172 @@ export async function deletePregunta(id: string): Promise<void> {
   const supabase = getSupabaseAdmin();
   const { error } = await supabase.from("preguntas").delete().eq("id", id);
   if (error) throw new Error(`deletePregunta: ${error.message}`);
+}
+
+export async function getRandomPreguntasByTema(
+  temaId: string,
+  n = 20,
+): Promise<Pregunta[]> {
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from("preguntas")
+    .select("id, tema_id, enunciado, opcion_a, opcion_b, opcion_c, correcta, created_at")
+    .eq("tema_id", temaId);
+
+  if (error) throw new Error(`getRandomPreguntasByTema: ${error.message}`);
+  return shuffled((data ?? []) as Pregunta[]).slice(0, n);
+}
+
+export async function getRandomPreguntasByAsignatura(
+  asignaturaId: string,
+  n = 20,
+): Promise<Pregunta[]> {
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from("preguntas")
+    .select(
+      "id, tema_id, enunciado, opcion_a, opcion_b, opcion_c, correcta, created_at, temas!inner(asignatura_id)",
+    )
+    .eq("temas.asignatura_id", asignaturaId);
+
+  if (error) throw new Error(`getRandomPreguntasByAsignatura: ${error.message}`);
+  return shuffled(
+    ((data ?? []) as Array<Pregunta & { temas: unknown }>).map((row) => ({
+      id: row.id,
+      tema_id: row.tema_id,
+      enunciado: row.enunciado,
+      opcion_a: row.opcion_a,
+      opcion_b: row.opcion_b,
+      opcion_c: row.opcion_c,
+      correcta: row.correcta,
+      created_at: row.created_at,
+    })),
+  ).slice(0, n);
+}
+
+export async function getCorrectasByPreguntaIds(
+  ids: string[],
+): Promise<CorrectaPregunta[]> {
+  if (!ids.length) return [];
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from("preguntas")
+    .select("id, tema_id, correcta, temas!inner(asignatura_id)")
+    .in("id", ids);
+
+  if (error) throw new Error(`getCorrectasByPreguntaIds: ${error.message}`);
+
+  return ((data ?? []) as Array<{
+    id: string;
+    tema_id: string;
+    correcta: CorrectaPregunta["correcta"];
+    temas: { asignatura_id: string } | Array<{ asignatura_id: string }>;
+  }>).map((row) => {
+    const tema = Array.isArray(row.temas) ? row.temas[0] : row.temas;
+    return {
+      id: row.id,
+      tema_id: row.tema_id,
+      correcta: row.correcta,
+      asignatura_id: tema?.asignatura_id ?? "",
+    };
+  });
+}
+
+export async function createTestWithRespuestas(
+  payload: CreateTestWithRespuestasInput,
+): Promise<{ id: string }> {
+  const supabase = getSupabaseAdmin();
+  const { respuestas, ...testRow } = payload;
+
+  const { data: test, error: testError } = await supabase
+    .from("tests")
+    .insert(testRow)
+    .select("id")
+    .single();
+
+  if (testError) {
+    throw new Error(`createTestWithRespuestas/insert tests: ${testError.message}`);
+  }
+
+  const rows = respuestas.map((respuesta) => ({ ...respuesta, test_id: test.id }));
+  const { error: respuestasError } = await supabase.from("test_respuestas").insert(rows);
+
+  if (respuestasError) {
+    await supabase.from("tests").delete().eq("id", test.id);
+    throw new Error(
+      `createTestWithRespuestas/insert respuestas: ${respuestasError.message}`,
+    );
+  }
+
+  return { id: test.id };
+}
+
+export async function getTestWithRespuestas(
+  testId: string,
+): Promise<TestDetalle | null> {
+  const supabase = getSupabaseAdmin();
+  const { data: test, error: testError } = await supabase
+    .from("tests")
+    .select(
+      "id, fecha, modo, modalidad, asignatura_id, tema_id, penalizacion, timer_minutos, aciertos, fallos, blancos, nota, asignaturas!inner(nombre), temas(nombre)",
+    )
+    .eq("id", testId)
+    .maybeSingle();
+
+  if (testError) throw new Error(`getTestWithRespuestas/test: ${testError.message}`);
+  if (!test) return null;
+
+  const { data: respuestas, error: respuestasError } = await supabase
+    .from("test_respuestas")
+    .select(
+      "id, test_id, pregunta_id, opcion_marcada, fue_dudosa, orden, preguntas!inner(id, tema_id, enunciado, opcion_a, opcion_b, opcion_c, correcta, created_at)",
+    )
+    .eq("test_id", testId)
+    .order("orden", { ascending: true });
+
+  if (respuestasError) {
+    throw new Error(`getTestWithRespuestas/respuestas: ${respuestasError.message}`);
+  }
+
+  const testRow = test as Test & {
+    asignaturas: { nombre: string } | Array<{ nombre: string }>;
+    temas: { nombre: string } | Array<{ nombre: string }> | null;
+  };
+  const asignatura = Array.isArray(testRow.asignaturas)
+    ? testRow.asignaturas[0]
+    : testRow.asignaturas;
+  const tema = Array.isArray(testRow.temas) ? testRow.temas[0] : testRow.temas;
+
+  return {
+    id: testRow.id,
+    fecha: testRow.fecha,
+    modo: testRow.modo,
+    modalidad: testRow.modalidad,
+    asignatura_id: testRow.asignatura_id,
+    tema_id: testRow.tema_id,
+    penalizacion: testRow.penalizacion,
+    timer_minutos: testRow.timer_minutos,
+    aciertos: testRow.aciertos,
+    fallos: testRow.fallos,
+    blancos: testRow.blancos,
+    nota: testRow.nota,
+    asignatura_nombre: asignatura?.nombre ?? "Sin asignatura",
+    tema_nombre: tema?.nombre ?? null,
+    respuestas: ((respuestas ?? []) as Array<
+      Omit<TestRespuestaDetalle, "pregunta"> & { preguntas: Pregunta | Array<Pregunta> }
+    >).map((respuesta) => {
+      const pregunta = Array.isArray(respuesta.preguntas)
+        ? respuesta.preguntas[0]
+        : respuesta.preguntas;
+      return {
+        id: respuesta.id,
+        test_id: respuesta.test_id,
+        pregunta_id: respuesta.pregunta_id,
+        opcion_marcada: respuesta.opcion_marcada,
+        fue_dudosa: respuesta.fue_dudosa,
+        orden: respuesta.orden,
+        pregunta,
+      };
+    }),
+  };
 }
