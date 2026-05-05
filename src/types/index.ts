@@ -63,8 +63,38 @@ export type TestRespuesta = {
   orden: number;
 };
 
+export type NewAsignatura = { nombre: string; orden?: number };
+export type UpdateAsignatura = Partial<Pick<Asignatura, "nombre" | "orden">>;
+export type NewTema = { asignatura_id: string; nombre: string; orden?: number };
+export type UpdateTema = Partial<Pick<Tema, "asignatura_id" | "nombre" | "orden">>;
 export type NewPregunta = Omit<Pregunta, "id" | "created_at">;
+export type UpdatePregunta = Partial<Omit<Pregunta, "id" | "created_at">>;
 export type NewTest = Omit<Test, "id" | "fecha">;
 export type NewTestRespuesta = Omit<TestRespuesta, "id">;
 
 export type ConfigUpdate = Pick<Config, "penalizacion" | "timer_minutos">;
+
+export type AsignaturaWithCounts = Asignatura & {
+  temas_count: number;
+  preguntas_count: number;
+};
+
+export type TemaWithAsignatura = Tema & {
+  asignatura_nombre: string;
+};
+
+export type TemaWithCounts = TemaWithAsignatura & {
+  preguntas_count: number;
+};
+
+export type PreguntaWithContext = Pregunta & {
+  tema_nombre: string;
+  asignatura_id: string;
+  asignatura_nombre: string;
+};
+
+export type PreguntaFilters = {
+  asignaturaId?: string;
+  temaId?: string;
+  q?: string;
+};

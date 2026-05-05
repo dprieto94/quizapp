@@ -14,7 +14,23 @@
  * tipa entrada y salida desde @/types y respeta el patrón de errores.
  */
 import { getSupabaseAdmin } from "@/lib/supabase";
-import type { Asignatura, Config, ConfigUpdate, Tema } from "@/types";
+import type {
+  Asignatura,
+  AsignaturaWithCounts,
+  Config,
+  ConfigUpdate,
+  NewAsignatura,
+  NewPregunta,
+  NewTema,
+  PreguntaFilters,
+  PreguntaWithContext,
+  Tema,
+  TemaWithAsignatura,
+  TemaWithCounts,
+  UpdateAsignatura,
+  UpdatePregunta,
+  UpdateTema,
+} from "@/types";
 
 export async function listAsignaturas(): Promise<Asignatura[]> {
   const supabase = getSupabaseAdmin();
@@ -25,6 +41,42 @@ export async function listAsignaturas(): Promise<Asignatura[]> {
 
   if (error) throw new Error(`listAsignaturas: ${error.message}`);
   return data ?? [];
+}
+
+export async function listAsignaturasWithCounts(): Promise<AsignaturaWithCounts[]> {
+  const supabase = getSupabaseAdmin();
+  const [{ data: asignaturas, error: asignaturasError }, { data: temas, error: temasError }, { data: preguntas, error: preguntasError }] =
+    await Promise.all([
+      supabase.from("asignaturas").select("id, nombre, orden").order("orden", { ascending: true }),
+      supabase.from("temas").select("id, asignatura_id"),
+      supabase.from("preguntas").select("id, temas!inner(asignatura_id)"),
+    ]);
+
+  if (asignaturasError) {
+    throw new Error(`listAsignaturasWithCounts: ${asignaturasError.message}`);
+  }
+  if (temasError) throw new Error(`listAsignaturasWithCounts: ${temasError.message}`);
+  if (preguntasError) {
+    throw new Error(`listAsignaturasWithCounts: ${preguntasError.message}`);
+  }
+
+  const temasCount = new Map<string, number>();
+  for (const tema of (temas ?? []) as Array<{ asignatura_id: string }>) {
+    temasCount.set(tema.asignatura_id, (temasCount.get(tema.asignatura_id) ?? 0) + 1);
+  }
+
+  const preguntasCount = new Map<string, number>();
+  for (const pregunta of (preguntas ?? []) as Array<{ temas: { asignatura_id: string } | Array<{ asignatura_id: string }> }>) {
+    const tema = Array.isArray(pregunta.temas) ? pregunta.temas[0] : pregunta.temas;
+    if (!tema) continue;
+    preguntasCount.set(tema.asignatura_id, (preguntasCount.get(tema.asignatura_id) ?? 0) + 1);
+  }
+
+  return ((asignaturas ?? []) as Asignatura[]).map((asignatura) => ({
+    ...asignatura,
+    temas_count: temasCount.get(asignatura.id) ?? 0,
+    preguntas_count: preguntasCount.get(asignatura.id) ?? 0,
+  }));
 }
 
 export async function getAsignatura(id: string): Promise<Asignatura | null> {
@@ -88,4 +140,269 @@ export async function updateConfig(payload: ConfigUpdate): Promise<Config> {
 
   if (error) throw new Error(`updateConfig: ${error.message}`);
   return data;
+}
+
+async function getNextAsignaturaOrden(): Promise<number> {
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from("asignaturas")
+    .select("orden")
+    .order("orden", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw new Error(`getNextAsignaturaOrden: ${error.message}`);
+  return ((data as { orden: number } | null)?.orden ?? 0) + 1;
+}
+
+async function getNextTemaOrden(asignaturaId: string): Promise<number> {
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from("temas")
+    .select("orden")
+    .eq("asignatura_id", asignaturaId)
+    .order("orden", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw new Error(`getNextTemaOrden: ${error.message}`);
+  return ((data as { orden: number } | null)?.orden ?? 0) + 1;
+}
+
+export async function createAsignatura(input: NewAsignatura): Promise<Asignatura> {
+  const supabase = getSupabaseAdmin();
+  const payload = {
+    nombre: input.nombre,
+    orden: input.orden ?? (await getNextAsignaturaOrden()),
+  };
+  const { data, error } = await supabase
+    .from("asignaturas")
+    .insert(payload)
+    .select("id, nombre, orden")
+    .single();
+
+  if (error) throw new Error(`createAsignatura: ${error.message}`);
+  return data;
+}
+
+export async function updateAsignatura(
+  id: string,
+  patch: UpdateAsignatura,
+): Promise<Asignatura> {
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from("asignaturas")
+    .update(patch)
+    .eq("id", id)
+    .select("id, nombre, orden")
+    .single();
+
+  if (error) throw new Error(`updateAsignatura: ${error.message}`);
+  return data;
+}
+
+export async function deleteAsignatura(id: string): Promise<void> {
+  const supabase = getSupabaseAdmin();
+  const { error } = await supabase.from("asignaturas").delete().eq("id", id);
+  if (error) throw new Error(`deleteAsignatura: ${error.message}`);
+}
+
+export async function countTemasYPreguntasByAsignatura(
+  id: string,
+): Promise<{ temas: number; preguntas: number }> {
+  const supabase = getSupabaseAdmin();
+  const [{ count: temas, error: temasError }, { count: preguntas, error: preguntasError }] =
+    await Promise.all([
+      supabase.from("temas").select("id", { count: "exact", head: true }).eq("asignatura_id", id),
+      supabase
+        .from("preguntas")
+        .select("id, temas!inner(asignatura_id)", { count: "exact", head: true })
+        .eq("temas.asignatura_id", id),
+    ]);
+
+  if (temasError) throw new Error(`countTemasYPreguntasByAsignatura: ${temasError.message}`);
+  if (preguntasError) {
+    throw new Error(`countTemasYPreguntasByAsignatura: ${preguntasError.message}`);
+  }
+
+  return { temas: temas ?? 0, preguntas: preguntas ?? 0 };
+}
+
+export async function listTemasWithAsignatura(): Promise<TemaWithAsignatura[]> {
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from("temas")
+    .select("id, asignatura_id, nombre, orden, asignaturas!inner(nombre)")
+    .order("orden", { ascending: true })
+    .order("orden", { referencedTable: "asignaturas", ascending: true });
+
+  if (error) throw new Error(`listTemasWithAsignatura: ${error.message}`);
+
+  return ((data ?? []) as Array<Tema & { asignaturas: { nombre: string } | Array<{ nombre: string }> }>).map(
+    (tema) => {
+      const asignatura = Array.isArray(tema.asignaturas) ? tema.asignaturas[0] : tema.asignaturas;
+      return {
+        id: tema.id,
+        asignatura_id: tema.asignatura_id,
+        nombre: tema.nombre,
+        orden: tema.orden,
+        asignatura_nombre: asignatura?.nombre ?? "Sin asignatura",
+      };
+    },
+  );
+}
+
+export async function listTemasWithCounts(): Promise<TemaWithCounts[]> {
+  const supabase = getSupabaseAdmin();
+  const [temas, preguntasResult] = await Promise.all([
+    listTemasWithAsignatura(),
+    supabase.from("preguntas").select("id, tema_id"),
+  ]);
+
+  const { data: preguntas, error } = preguntasResult;
+  if (error) throw new Error(`listTemasWithCounts: ${error.message}`);
+
+  const counts = new Map<string, number>();
+  for (const pregunta of (preguntas ?? []) as Array<{ tema_id: string }>) {
+    counts.set(pregunta.tema_id, (counts.get(pregunta.tema_id) ?? 0) + 1);
+  }
+
+  return temas.map((tema) => ({ ...tema, preguntas_count: counts.get(tema.id) ?? 0 }));
+}
+
+export async function createTema(input: NewTema): Promise<Tema> {
+  const supabase = getSupabaseAdmin();
+  const payload = {
+    asignatura_id: input.asignatura_id,
+    nombre: input.nombre,
+    orden: input.orden ?? (await getNextTemaOrden(input.asignatura_id)),
+  };
+  const { data, error } = await supabase
+    .from("temas")
+    .insert(payload)
+    .select("id, asignatura_id, nombre, orden")
+    .single();
+
+  if (error) throw new Error(`createTema: ${error.message}`);
+  return data;
+}
+
+export async function updateTema(id: string, patch: UpdateTema): Promise<Tema> {
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from("temas")
+    .update(patch)
+    .eq("id", id)
+    .select("id, asignatura_id, nombre, orden")
+    .single();
+
+  if (error) throw new Error(`updateTema: ${error.message}`);
+  return data;
+}
+
+export async function deleteTema(id: string): Promise<void> {
+  const supabase = getSupabaseAdmin();
+  const { error } = await supabase.from("temas").delete().eq("id", id);
+  if (error) throw new Error(`deleteTema: ${error.message}`);
+}
+
+export async function countPreguntasByTema(id: string): Promise<number> {
+  const supabase = getSupabaseAdmin();
+  const { count, error } = await supabase
+    .from("preguntas")
+    .select("id", { count: "exact", head: true })
+    .eq("tema_id", id);
+
+  if (error) throw new Error(`countPreguntasByTema: ${error.message}`);
+  return count ?? 0;
+}
+
+export async function listPreguntas(
+  filters: PreguntaFilters = {},
+): Promise<PreguntaWithContext[]> {
+  const supabase = getSupabaseAdmin();
+  let query = supabase
+    .from("preguntas")
+    .select(
+      "id, tema_id, enunciado, opcion_a, opcion_b, opcion_c, correcta, created_at, temas!inner(nombre, asignatura_id, asignaturas!inner(nombre))",
+    )
+    .order("created_at", { ascending: false });
+
+  if (filters.temaId) query = query.eq("tema_id", filters.temaId);
+  if (filters.asignaturaId) query = query.eq("temas.asignatura_id", filters.asignaturaId);
+  if (filters.q?.trim()) query = query.ilike("enunciado", `%${filters.q.trim()}%`);
+
+  const { data, error } = await query;
+  if (error) throw new Error(`listPreguntas: ${error.message}`);
+
+  return ((data ?? []) as Array<
+    NewPregunta & {
+      id: string;
+      created_at: string | null;
+      temas: {
+        nombre: string;
+        asignatura_id: string;
+        asignaturas: { nombre: string } | Array<{ nombre: string }>;
+      } | Array<{
+        nombre: string;
+        asignatura_id: string;
+        asignaturas: { nombre: string } | Array<{ nombre: string }>;
+      }>;
+    }
+  >).map((pregunta) => {
+    const tema = Array.isArray(pregunta.temas) ? pregunta.temas[0] : pregunta.temas;
+    const asignatura = tema
+      ? Array.isArray(tema.asignaturas)
+        ? tema.asignaturas[0]
+        : tema.asignaturas
+      : null;
+
+    return {
+      id: pregunta.id,
+      tema_id: pregunta.tema_id,
+      enunciado: pregunta.enunciado,
+      opcion_a: pregunta.opcion_a,
+      opcion_b: pregunta.opcion_b,
+      opcion_c: pregunta.opcion_c,
+      correcta: pregunta.correcta,
+      created_at: pregunta.created_at,
+      tema_nombre: tema?.nombre ?? "Sin tema",
+      asignatura_id: tema?.asignatura_id ?? "",
+      asignatura_nombre: asignatura?.nombre ?? "Sin asignatura",
+    };
+  });
+}
+
+export async function createPregunta(input: NewPregunta): Promise<NewPregunta & { id: string; created_at: string | null }> {
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from("preguntas")
+    .insert(input)
+    .select("id, tema_id, enunciado, opcion_a, opcion_b, opcion_c, correcta, created_at")
+    .single();
+
+  if (error) throw new Error(`createPregunta: ${error.message}`);
+  return data;
+}
+
+export async function updatePregunta(
+  id: string,
+  patch: UpdatePregunta,
+): Promise<NewPregunta & { id: string; created_at: string | null }> {
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from("preguntas")
+    .update(patch)
+    .eq("id", id)
+    .select("id, tema_id, enunciado, opcion_a, opcion_b, opcion_c, correcta, created_at")
+    .single();
+
+  if (error) throw new Error(`updatePregunta: ${error.message}`);
+  return data;
+}
+
+export async function deletePregunta(id: string): Promise<void> {
+  const supabase = getSupabaseAdmin();
+  const { error } = await supabase.from("preguntas").delete().eq("id", id);
+  if (error) throw new Error(`deletePregunta: ${error.message}`);
 }
