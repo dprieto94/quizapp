@@ -101,6 +101,8 @@ export type PreguntaFilters = {
 
 export type PreguntaPublica = Omit<Pregunta, "correcta" | "created_at">;
 
+export type CorrectasMap = Record<string, Opcion>;
+
 export type RespuestaEntrega = {
   pregunta_id: string;
   opcion_marcada: Opcion | null;

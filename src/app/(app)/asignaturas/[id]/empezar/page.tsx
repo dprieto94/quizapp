@@ -67,6 +67,10 @@ export default async function EmpezarPage({ params, searchParams }: Props) {
     opcion_b: pregunta.opcion_b,
     opcion_c: pregunta.opcion_c,
   }));
+  const correctas =
+    modo === "estudio"
+      ? Object.fromEntries(preguntas.map((p) => [p.id, p.correcta]))
+      : undefined;
 
   return (
     <TestRunner
@@ -76,6 +80,7 @@ export default async function EmpezarPage({ params, searchParams }: Props) {
       modalidad={modalidad}
       preguntas={publicPreguntas}
       timerMinutos={modo === "examen" ? config.timer_minutos : 0}
+      correctas={correctas}
     />
   );
 }

@@ -5,7 +5,14 @@ import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { ProgressBar } from "@/components/ui/ProgressBar";
 import { cn } from "@/lib/cn";
-import type { Modalidad, Modo, Opcion, PreguntaPublica, RespuestaEntrega } from "@/types";
+import type {
+  CorrectasMap,
+  Modalidad,
+  Modo,
+  Opcion,
+  PreguntaPublica,
+  RespuestaEntrega,
+} from "@/types";
 import { QuestionCard } from "./QuestionCard";
 import { Timer } from "./Timer";
 import { finalizarTest } from "@/app/(app)/asignaturas/[id]/empezar/actions";
@@ -17,6 +24,7 @@ type Props = {
   modalidad: Modalidad;
   preguntas: PreguntaPublica[];
   timerMinutos: number;
+  correctas?: CorrectasMap;
 };
 
 export function TestRunner({
@@ -26,7 +34,9 @@ export function TestRunner({
   modalidad,
   preguntas,
   timerMinutos,
+  correctas,
 }: Props) {
+  const isEstudio = modo === "estudio";
   const [respuestas, setRespuestas] = useState<RespuestaEntrega[]>(() =>
     preguntas.map((pregunta, index) => ({
       pregunta_id: pregunta.id,
@@ -58,11 +68,21 @@ export function TestRunner({
   const dudosas = respuestas.filter((respuesta) => respuesta.fue_dudosa).length;
   const blancos = respuestas.length - contestadas;
   const progress = ((currentIndex + 1) / preguntas.length) * 100;
+  const aciertosVivo = isEstudio
+    ? respuestas.filter(
+        (r) => r.opcion_marcada && correctas?.[r.pregunta_id] === r.opcion_marcada,
+      ).length
+    : 0;
 
   function updateRespuesta(index: number, patch: Partial<RespuestaEntrega>) {
     setRespuestas((current) =>
       current.map((respuesta, i) => (i === index ? { ...respuesta, ...patch } : respuesta)),
     );
+  }
+
+  function selectOpcion(opcion: Opcion) {
+    if (isEstudio && currentRespuesta?.opcion_marcada !== null) return;
+    updateRespuesta(currentIndex, { opcion_marcada: opcion });
   }
 
   function go(delta: number) {
@@ -115,6 +135,11 @@ export function TestRunner({
               </button>
             ) : null}
           </div>
+          {isEstudio && contestadas > 0 ? (
+            <span className="text-sm text-muted tabular-nums">
+              {aciertosVivo}/{contestadas} correctas
+            </span>
+          ) : null}
           {timerMinutos > 0 ? <Timer minutos={timerMinutos} onExpire={submitNow} /> : null}
         </div>
         <ProgressBar value={progress} aria-label="Progreso del test" className="mt-3" />
@@ -125,7 +150,8 @@ export function TestRunner({
           pregunta={currentPregunta}
           seleccionada={currentRespuesta.opcion_marcada}
           dudosa={currentRespuesta.fue_dudosa}
-          onSelect={(opcion: Opcion) => updateRespuesta(currentIndex, { opcion_marcada: opcion })}
+          correcta={isEstudio ? correctas?.[currentPregunta.id] : undefined}
+          onSelect={selectOpcion}
           onToggleDudosa={() =>
             updateRespuesta(currentIndex, { fue_dudosa: !currentRespuesta.fue_dudosa })
           }
@@ -136,6 +162,10 @@ export function TestRunner({
         {visibleIndices.map((index, position) => {
           const respuesta = respuestas[index];
           const active = index === currentIndex;
+          const incorrecta =
+            isEstudio &&
+            respuesta.opcion_marcada !== null &&
+            correctas?.[respuesta.pregunta_id] !== respuesta.opcion_marcada;
           return (
             <button
               key={index}
@@ -147,9 +177,11 @@ export function TestRunner({
                   ? "border-primary bg-primary text-white"
                   : respuesta.fue_dudosa
                     ? "border-warning bg-warning/20 text-foreground"
-                    : respuesta.opcion_marcada
-                      ? "border-primary-light bg-primary-soft text-primary"
-                      : "border-border text-muted",
+                    : incorrecta
+                      ? "border-danger/60 bg-danger/10 text-danger"
+                      : respuesta.opcion_marcada
+                        ? "border-primary-light bg-primary-soft text-primary"
+                        : "border-border text-muted",
               )}
             >
               {index + 1}

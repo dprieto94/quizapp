@@ -71,7 +71,7 @@ export async function finalizarTest(input: unknown) {
     modalidad,
     asignatura_id: asignaturaId,
     tema_id: modalidad === "tema" ? temaId : null,
-    penalizacion: config.penalizacion,
+    penalizacion: modo === "estudio" ? 0 : config.penalizacion,
     timer_minutos: modo === "examen" ? config.timer_minutos : null,
     aciertos,
     fallos,

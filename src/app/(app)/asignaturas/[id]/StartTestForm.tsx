@@ -22,11 +22,12 @@ const selectClass =
 export function StartTestForm({ asignatura, temas, timerMinutos, penalizacion }: Props) {
   const router = useRouter();
   const [modalidad, setModalidad] = useState<"tema" | "asignatura">("tema");
+  const [modo, setModo] = useState<"examen" | "estudio">("examen");
   const [temaId, setTemaId] = useState(temas[0]?.id ?? "");
 
   function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    const params = new URLSearchParams({ modalidad, modo: "examen" });
+    const params = new URLSearchParams({ modalidad, modo });
     if (modalidad === "tema") params.set("tema", temaId);
     router.push(`/asignaturas/${asignatura.id}/empezar?${params.toString()}`);
   }
@@ -88,7 +89,13 @@ export function StartTestForm({ asignatura, temas, timerMinutos, penalizacion }:
         <h2 className="text-lg font-semibold">Modo</h2>
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           <label className={radioCard}>
-            <input type="radio" name="modo" value="examen" defaultChecked />
+            <input
+              type="radio"
+              name="modo"
+              value="examen"
+              checked={modo === "examen"}
+              onChange={() => setModo("examen")}
+            />
             <span>
               <strong>Examen</strong>
               <span className="mt-1 block text-sm text-muted">
@@ -96,11 +103,19 @@ export function StartTestForm({ asignatura, temas, timerMinutos, penalizacion }:
               </span>
             </span>
           </label>
-          <label className="flex cursor-not-allowed gap-3 rounded-xl border border-border p-4 opacity-60">
-            <input type="radio" name="modo" value="estudio" disabled />
+          <label className={radioCard}>
+            <input
+              type="radio"
+              name="modo"
+              value="estudio"
+              checked={modo === "estudio"}
+              onChange={() => setModo("estudio")}
+            />
             <span>
               <strong>Estudio</strong>
-              <span className="mt-1 block text-sm text-muted">Se activará en la Fase 8.</span>
+              <span className="mt-1 block text-sm text-muted">
+                Sin timer, feedback inmediato pregunta a pregunta. Sin nota — se muestra el porcentaje de aciertos.
+              </span>
             </span>
           </label>
         </div>
