@@ -1,5 +1,5 @@
 export type Modo = "examen" | "estudio";
-export type Modalidad = "tema" | "asignatura";
+export type Modalidad = "temas" | "asignatura";
 export type Opcion = "a" | "b" | "c";
 
 export type User = {
@@ -13,6 +13,7 @@ export type Config = {
   id: number;
   penalizacion: number;
   timer_minutos: number;
+  preguntas_por_test: number;
 };
 
 export type Asignatura = {
@@ -36,6 +37,8 @@ export type Pregunta = {
   opcion_b: string;
   opcion_c: string;
   correcta: Opcion;
+  justificacion: string | null;
+  fuente: string | null;
   created_at: string | null;
 };
 
@@ -45,7 +48,7 @@ export type Test = {
   modo: Modo;
   modalidad: Modalidad;
   asignatura_id: string;
-  tema_id: string | null;
+  preguntas_por_test: number;
   penalizacion: number;
   timer_minutos: number | null;
   aciertos: number;
@@ -72,7 +75,10 @@ export type UpdatePregunta = Partial<Omit<Pregunta, "id" | "created_at">>;
 export type NewTest = Omit<Test, "id" | "fecha">;
 export type NewTestRespuesta = Omit<TestRespuesta, "id">;
 
-export type ConfigUpdate = Pick<Config, "penalizacion" | "timer_minutos">;
+export type ConfigUpdate = Pick<
+  Config,
+  "penalizacion" | "timer_minutos" | "preguntas_por_test"
+>;
 
 export type AsignaturaWithCounts = Asignatura & {
   temas_count: number;
@@ -99,7 +105,9 @@ export type PreguntaFilters = {
   q?: string;
 };
 
-export type PreguntaPublica = Omit<Pregunta, "correcta" | "created_at">;
+export type PreguntaConTema = Pregunta & { tema_nombre: string };
+
+export type PreguntaPublica = Omit<PreguntaConTema, "correcta" | "created_at">;
 
 export type CorrectasMap = Record<string, Opcion>;
 
@@ -111,6 +119,7 @@ export type RespuestaEntrega = {
 };
 
 export type CreateTestWithRespuestasInput = Omit<Test, "id" | "fecha"> & {
+  tema_ids: string[];
   respuestas: RespuestaEntrega[];
 };
 
@@ -119,11 +128,11 @@ export type CorrectaPregunta = Pick<Pregunta, "id" | "tema_id" | "correcta"> & {
 };
 
 export type TestRespuestaDetalle = TestRespuesta & {
-  pregunta: Pregunta;
+  pregunta: PreguntaConTema;
 };
 
 export type TestDetalle = Test & {
   asignatura_nombre: string;
-  tema_nombre: string | null;
+  temas: Array<{ id: string; nombre: string; orden: number }>;
   respuestas: TestRespuestaDetalle[];
 };

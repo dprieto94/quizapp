@@ -167,6 +167,8 @@ export async function createPreguntaAction(
       opcion_b: value(formData, "opcion_b"),
       opcion_c: value(formData, "opcion_c"),
       correcta: value(formData, "correcta"),
+      justificacion: value(formData, "justificacion"),
+      fuente: value(formData, "fuente"),
     });
     await createPregunta(input);
     revalidatePath("/admin/preguntas");
@@ -191,6 +193,8 @@ export async function updatePreguntaAction(
       opcion_b: value(formData, "opcion_b") ?? undefined,
       opcion_c: value(formData, "opcion_c") ?? undefined,
       correcta: value(formData, "correcta") ?? undefined,
+      justificacion: value(formData, "justificacion") ?? undefined,
+      fuente: value(formData, "fuente") ?? undefined,
     });
     await updatePregunta(id, patch);
     revalidatePath("/admin/preguntas");

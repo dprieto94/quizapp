@@ -19,10 +19,10 @@ const respuestaSchema = z.object({
 
 const payloadSchema = z.object({
   asignaturaId: z.string().uuid(),
-  temaId: z.string().uuid().nullable(),
+  temaIds: z.array(z.string().uuid()).max(50),
   modo: z.enum(["examen", "estudio"]),
-  modalidad: z.enum(["tema", "asignatura"]),
-  respuestas: z.array(respuestaSchema).min(1).max(20),
+  modalidad: z.enum(["temas", "asignatura"]),
+  respuestas: z.array(respuestaSchema).min(1).max(30),
 });
 
 export async function finalizarTest(input: unknown) {
@@ -32,17 +32,20 @@ export async function finalizarTest(input: unknown) {
   const parsed = payloadSchema.safeParse(input);
   if (!parsed.success) throw new Error("Payload de test inválido");
 
-  const { asignaturaId, temaId, modo, modalidad, respuestas } = parsed.data;
-  if (modalidad === "tema" && !temaId) throw new Error("Tema requerido");
+  const { asignaturaId, temaIds, modo, modalidad, respuestas } = parsed.data;
+  if (modalidad === "temas" && temaIds.length === 0) {
+    throw new Error("Modalidad 'temas' requiere al menos un tema seleccionado");
+  }
 
   const correctas = await getCorrectasByPreguntaIds(
-    respuestas.map((respuesta) => respuesta.pregunta_id),
+    respuestas.map((r) => r.pregunta_id),
   );
   if (correctas.length !== respuestas.length) {
     throw new Error("Alguna pregunta del test ya no existe");
   }
 
-  const correctasById = new Map(correctas.map((pregunta) => [pregunta.id, pregunta]));
+  const correctasById = new Map(correctas.map((p) => [p.id, p]));
+  const allowedTemaIds = new Set(temaIds);
   let aciertos = 0;
   let fallos = 0;
   let blancos = 0;
@@ -50,9 +53,11 @@ export async function finalizarTest(input: unknown) {
   for (const respuesta of respuestas) {
     const pregunta = correctasById.get(respuesta.pregunta_id);
     if (!pregunta) throw new Error("Pregunta inválida");
-    if (pregunta.asignatura_id !== asignaturaId) throw new Error("Pregunta fuera de asignatura");
-    if (modalidad === "tema" && pregunta.tema_id !== temaId) {
-      throw new Error("Pregunta fuera de tema");
+    if (pregunta.asignatura_id !== asignaturaId) {
+      throw new Error("Pregunta fuera de asignatura");
+    }
+    if (modalidad === "temas" && !allowedTemaIds.has(pregunta.tema_id)) {
+      throw new Error("Pregunta fuera de los temas seleccionados");
     }
 
     if (respuesta.opcion_marcada === null) blancos++;
@@ -70,13 +75,14 @@ export async function finalizarTest(input: unknown) {
     modo,
     modalidad,
     asignatura_id: asignaturaId,
-    tema_id: modalidad === "tema" ? temaId : null,
+    preguntas_por_test: respuestas.length,
     penalizacion: modo === "estudio" ? 0 : config.penalizacion,
     timer_minutos: modo === "examen" ? config.timer_minutos : null,
     aciertos,
     fallos,
     blancos,
     nota,
+    tema_ids: modalidad === "temas" ? temaIds : [],
     respuestas,
   });
 

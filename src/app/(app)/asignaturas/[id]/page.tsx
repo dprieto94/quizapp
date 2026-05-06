@@ -35,6 +35,7 @@ export default async function AsignaturaPage({ params }: Props) {
           temas={temas}
           timerMinutos={config.timer_minutos}
           penalizacion={config.penalizacion}
+          preguntasPorTest={config.preguntas_por_test}
         />
       ) : (
         <div className="rounded-xl border border-border bg-primary-soft p-5">

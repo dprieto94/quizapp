@@ -1,6 +1,6 @@
 "use client";
 
-import { Bookmark, Check, X } from "lucide-react";
+import { Bookmark, Check, Lightbulb, X } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/cn";
@@ -104,6 +104,32 @@ export function QuestionCard({
           );
         })}
       </div>
+
+      {revealed && !acerto && (pregunta.justificacion || pregunta.fuente) ? (
+        <aside className="mt-5 rounded-r-lg border-l-4 border-primary bg-primary-soft/40 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h3 className="flex items-center gap-2 text-sm font-semibold text-primary">
+              <Lightbulb className="size-4" /> Justificación
+            </h3>
+            <span className="text-xs text-muted">
+              <span className="font-medium">Tema:</span> {pregunta.tema_nombre}
+            </span>
+          </div>
+          {pregunta.justificacion ? (
+            <p className="mt-2 whitespace-pre-line text-sm">{pregunta.justificacion}</p>
+          ) : null}
+          {pregunta.fuente ? (
+            <p
+              className={cn(
+                "text-xs text-muted",
+                pregunta.justificacion ? "mt-3 border-t border-border/60 pt-3" : "mt-2",
+              )}
+            >
+              <span className="font-medium">Fuente:</span> {pregunta.fuente}
+            </p>
+          ) : null}
+        </aside>
+      ) : null}
 
       {revealed ? (
         <p className="sr-only" aria-live="polite">

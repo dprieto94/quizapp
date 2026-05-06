@@ -5,6 +5,12 @@ const optionalOrden = z.preprocess(
   z.coerce.number().int().min(1).max(999).optional(),
 );
 
+const optionalLongText = (max: number) =>
+  z.preprocess(
+    (value) => (typeof value === "string" && value.trim() === "" ? null : value),
+    z.string().max(max).nullable(),
+  );
+
 export const asignaturaSchema = z.object({
   nombre: z.string().trim().min(1, "Obligatorio").max(100),
   orden: optionalOrden,
@@ -27,8 +33,16 @@ export const preguntaSchema = z.object({
   opcion_b: z.string().trim().min(1, "Obligatorio").max(500),
   opcion_c: z.string().trim().min(1, "Obligatorio").max(500),
   correcta: z.enum(["a", "b", "c"]),
+  justificacion: optionalLongText(4000),
+  fuente: optionalLongText(500),
 });
 
 export const preguntaUpdateSchema = preguntaSchema.partial();
 
 export type PreguntaFormValues = z.infer<typeof preguntaSchema>;
+
+export const configSchema = z.object({
+  penalizacion: z.coerce.number().min(0).max(1),
+  timer_minutos: z.coerce.number().int().min(5).max(180),
+  preguntas_por_test: z.coerce.number().int().min(20).max(30),
+});

@@ -1,3 +1,4 @@
+import { Lightbulb } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Badge } from "@/components/ui/Badge";
@@ -54,11 +55,22 @@ export default async function ResultadoPage({ params }: Props) {
 
   const total = test.aciertos + test.fallos + test.blancos;
   const porcentaje = total ? Math.round((test.aciertos / total) * 100) : 0;
-  const repeatUrl = `/asignaturas/${test.asignatura_id}/empezar?${new URLSearchParams({
+
+  const repeatParams = new URLSearchParams({
     modalidad: test.modalidad,
     modo: test.modo,
-    ...(test.tema_id ? { tema: test.tema_id } : {}),
-  }).toString()}`;
+  });
+  if (test.modalidad === "temas" && test.temas.length > 0) {
+    repeatParams.set("temas", test.temas.map((t) => t.id).join(","));
+  }
+  const repeatUrl = `/asignaturas/${test.asignatura_id}/empezar?${repeatParams.toString()}`;
+
+  const modalidadBadge =
+    test.modalidad === "temas"
+      ? test.temas.length === 1
+        ? test.temas[0].nombre
+        : `${test.temas.length} temas`
+      : "Asignatura completa";
 
   return (
     <div className="space-y-6">
@@ -74,9 +86,24 @@ export default async function ResultadoPage({ params }: Props) {
           <Badge variant="success">{test.aciertos} aciertos</Badge>
           <Badge variant="danger">{test.fallos} fallos</Badge>
           <Badge variant="neutral">{test.blancos} en blanco</Badge>
-          <Badge>{test.modalidad === "tema" ? test.tema_nombre : "Asignatura completa"}</Badge>
+          <Badge>{modalidadBadge}</Badge>
         </div>
       </Card>
+
+      {test.modalidad === "temas" && test.temas.length > 1 ? (
+        <Card>
+          <h2 className="text-sm font-semibold">Temas incluidos</h2>
+          <ul className="mt-2 flex flex-wrap gap-2">
+            {test.temas.map((tema) => (
+              <li key={tema.id}>
+                <Badge>
+                  {tema.orden}. {tema.nombre}
+                </Badge>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      ) : null}
 
       <div className="flex flex-col gap-3 sm:flex-row">
         <Link
@@ -98,10 +125,15 @@ export default async function ResultadoPage({ params }: Props) {
         {test.respuestas.map((respuesta, index) => {
           const estado = estadoRespuesta(respuesta);
           return (
-            <details key={respuesta.id} className="rounded-xl border border-border bg-background p-4">
+            <details
+              key={respuesta.id}
+              className="rounded-xl border border-border bg-background p-4"
+            >
               <summary className="cursor-pointer list-none">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                  <span className="font-medium">{index + 1}. {respuesta.pregunta.enunciado}</span>
+                  <span className="font-medium">
+                    {index + 1}. {respuesta.pregunta.enunciado}
+                  </span>
                   <span className="flex flex-wrap gap-2">
                     <Badge
                       variant={
@@ -112,9 +144,15 @@ export default async function ResultadoPage({ params }: Props) {
                             : "neutral"
                       }
                     >
-                      {estado === "correcta" ? "Correcta" : estado === "incorrecta" ? "Incorrecta" : "En blanco"}
+                      {estado === "correcta"
+                        ? "Correcta"
+                        : estado === "incorrecta"
+                          ? "Incorrecta"
+                          : "En blanco"}
                     </Badge>
-                    {respuesta.fue_dudosa ? <Badge variant="warning">Dudosa</Badge> : null}
+                    {respuesta.fue_dudosa ? (
+                      <Badge variant="warning">Dudosa</Badge>
+                    ) : null}
                   </span>
                 </div>
               </summary>
@@ -129,6 +167,37 @@ export default async function ResultadoPage({ params }: Props) {
                   />
                 ))}
               </ul>
+              {respuesta.pregunta.justificacion || respuesta.pregunta.fuente ? (
+                <aside className="mt-4 rounded-r-lg border-l-4 border-primary bg-primary-soft/40 p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h3 className="flex items-center gap-2 text-sm font-semibold text-primary">
+                      <Lightbulb className="size-4" /> Justificación
+                    </h3>
+                    <span className="text-xs text-muted">
+                      <span className="font-medium">Tema:</span>{" "}
+                      {respuesta.pregunta.tema_nombre}
+                    </span>
+                  </div>
+                  {respuesta.pregunta.justificacion ? (
+                    <p className="mt-2 whitespace-pre-line text-sm">
+                      {respuesta.pregunta.justificacion}
+                    </p>
+                  ) : null}
+                  {respuesta.pregunta.fuente ? (
+                    <p
+                      className={cn(
+                        "text-xs text-muted",
+                        respuesta.pregunta.justificacion
+                          ? "mt-3 border-t border-border/60 pt-3"
+                          : "mt-2",
+                      )}
+                    >
+                      <span className="font-medium">Fuente:</span>{" "}
+                      {respuesta.pregunta.fuente}
+                    </p>
+                  ) : null}
+                </aside>
+              ) : null}
             </details>
           );
         })}

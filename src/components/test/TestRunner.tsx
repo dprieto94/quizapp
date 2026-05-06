@@ -19,7 +19,7 @@ import { finalizarTest } from "@/app/(app)/asignaturas/[id]/empezar/actions";
 
 type Props = {
   asignaturaId: string;
-  temaId: string | null;
+  temaIds: string[];
   modo: Modo;
   modalidad: Modalidad;
   preguntas: PreguntaPublica[];
@@ -29,7 +29,7 @@ type Props = {
 
 export function TestRunner({
   asignaturaId,
-  temaId,
+  temaIds,
   modo,
   modalidad,
   preguntas,
@@ -97,7 +97,7 @@ export function TestRunner({
     startTransition(async () => {
       await finalizarTest({
         asignaturaId,
-        temaId,
+        temaIds,
         modo,
         modalidad,
         respuestas: respuestasRef.current,

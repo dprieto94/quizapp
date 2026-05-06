@@ -25,6 +25,7 @@ import type {
   NewPregunta,
   NewTema,
   Pregunta,
+  PreguntaConTema,
   PreguntaFilters,
   PreguntaWithContext,
   Tema,
@@ -136,7 +137,7 @@ export async function getConfig(): Promise<Config> {
   const supabase = getSupabaseAdmin();
   const { data, error } = await supabase
     .from("config")
-    .select("id, penalizacion, timer_minutos")
+    .select("id, penalizacion, timer_minutos, preguntas_por_test")
     .eq("id", 1)
     .single();
 
@@ -150,7 +151,7 @@ export async function updateConfig(payload: ConfigUpdate): Promise<Config> {
     .from("config")
     .update(payload)
     .eq("id", 1)
-    .select("id, penalizacion, timer_minutos")
+    .select("id, penalizacion, timer_minutos, preguntas_por_test")
     .single();
 
   if (error) throw new Error(`updateConfig: ${error.message}`);
@@ -339,7 +340,7 @@ export async function listPreguntas(
   let query = supabase
     .from("preguntas")
     .select(
-      "id, tema_id, enunciado, opcion_a, opcion_b, opcion_c, correcta, created_at, temas!inner(nombre, asignatura_id, asignaturas!inner(nombre))",
+      "id, tema_id, enunciado, opcion_a, opcion_b, opcion_c, correcta, justificacion, fuente, created_at, temas!inner(nombre, asignatura_id, asignaturas!inner(nombre))",
     )
     .order("created_at", { ascending: false });
 
@@ -351,9 +352,7 @@ export async function listPreguntas(
   if (error) throw new Error(`listPreguntas: ${error.message}`);
 
   return ((data ?? []) as Array<
-    NewPregunta & {
-      id: string;
-      created_at: string | null;
+    Pregunta & {
       temas: {
         nombre: string;
         asignatura_id: string;
@@ -380,6 +379,8 @@ export async function listPreguntas(
       opcion_b: pregunta.opcion_b,
       opcion_c: pregunta.opcion_c,
       correcta: pregunta.correcta,
+      justificacion: pregunta.justificacion,
+      fuente: pregunta.fuente,
       created_at: pregunta.created_at,
       tema_nombre: tema?.nombre ?? "Sin tema",
       asignatura_id: tema?.asignatura_id ?? "",
@@ -388,12 +389,14 @@ export async function listPreguntas(
   });
 }
 
-export async function createPregunta(input: NewPregunta): Promise<NewPregunta & { id: string; created_at: string | null }> {
+export async function createPregunta(input: NewPregunta): Promise<Pregunta> {
   const supabase = getSupabaseAdmin();
   const { data, error } = await supabase
     .from("preguntas")
     .insert(input)
-    .select("id, tema_id, enunciado, opcion_a, opcion_b, opcion_c, correcta, created_at")
+    .select(
+      "id, tema_id, enunciado, opcion_a, opcion_b, opcion_c, correcta, justificacion, fuente, created_at",
+    )
     .single();
 
   if (error) throw new Error(`createPregunta: ${error.message}`);
@@ -403,13 +406,15 @@ export async function createPregunta(input: NewPregunta): Promise<NewPregunta & 
 export async function updatePregunta(
   id: string,
   patch: UpdatePregunta,
-): Promise<NewPregunta & { id: string; created_at: string | null }> {
+): Promise<Pregunta> {
   const supabase = getSupabaseAdmin();
   const { data, error } = await supabase
     .from("preguntas")
     .update(patch)
     .eq("id", id)
-    .select("id, tema_id, enunciado, opcion_a, opcion_b, opcion_c, correcta, created_at")
+    .select(
+      "id, tema_id, enunciado, opcion_a, opcion_b, opcion_c, correcta, justificacion, fuente, created_at",
+    )
     .single();
 
   if (error) throw new Error(`updatePregunta: ${error.message}`);
@@ -422,35 +427,26 @@ export async function deletePregunta(id: string): Promise<void> {
   if (error) throw new Error(`deletePregunta: ${error.message}`);
 }
 
-export async function getRandomPreguntasByTema(
-  temaId: string,
+export async function getRandomPreguntasByTemas(
+  temaIds: string[],
   n = 20,
-): Promise<Pregunta[]> {
-  const supabase = getSupabaseAdmin();
-  const { data, error } = await supabase
-    .from("preguntas")
-    .select("id, tema_id, enunciado, opcion_a, opcion_b, opcion_c, correcta, created_at")
-    .eq("tema_id", temaId);
-
-  if (error) throw new Error(`getRandomPreguntasByTema: ${error.message}`);
-  return shuffled((data ?? []) as Pregunta[]).slice(0, n);
-}
-
-export async function getRandomPreguntasByAsignatura(
-  asignaturaId: string,
-  n = 20,
-): Promise<Pregunta[]> {
+): Promise<PreguntaConTema[]> {
+  if (!temaIds.length) return [];
   const supabase = getSupabaseAdmin();
   const { data, error } = await supabase
     .from("preguntas")
     .select(
-      "id, tema_id, enunciado, opcion_a, opcion_b, opcion_c, correcta, created_at, temas!inner(asignatura_id)",
+      "id, tema_id, enunciado, opcion_a, opcion_b, opcion_c, correcta, justificacion, fuente, created_at, temas!inner(nombre)",
     )
-    .eq("temas.asignatura_id", asignaturaId);
+    .in("tema_id", temaIds);
 
-  if (error) throw new Error(`getRandomPreguntasByAsignatura: ${error.message}`);
-  return shuffled(
-    ((data ?? []) as Array<Pregunta & { temas: unknown }>).map((row) => ({
+  if (error) throw new Error(`getRandomPreguntasByTemas: ${error.message}`);
+
+  const flat = ((data ?? []) as Array<
+    Pregunta & { temas: { nombre: string } | Array<{ nombre: string }> }
+  >).map((row) => {
+    const tema = Array.isArray(row.temas) ? row.temas[0] : row.temas;
+    return {
       id: row.id,
       tema_id: row.tema_id,
       enunciado: row.enunciado,
@@ -458,9 +454,54 @@ export async function getRandomPreguntasByAsignatura(
       opcion_b: row.opcion_b,
       opcion_c: row.opcion_c,
       correcta: row.correcta,
+      justificacion: row.justificacion,
+      fuente: row.fuente,
       created_at: row.created_at,
-    })),
-  ).slice(0, n);
+      tema_nombre: tema?.nombre ?? "Sin tema",
+    };
+  });
+
+  return shuffled(flat).slice(0, n);
+}
+
+export async function getRandomPreguntasByAsignatura(
+  asignaturaId: string,
+  n = 20,
+): Promise<PreguntaConTema[]> {
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from("preguntas")
+    .select(
+      "id, tema_id, enunciado, opcion_a, opcion_b, opcion_c, correcta, justificacion, fuente, created_at, temas!inner(nombre, asignatura_id)",
+    )
+    .eq("temas.asignatura_id", asignaturaId);
+
+  if (error) throw new Error(`getRandomPreguntasByAsignatura: ${error.message}`);
+
+  const flat = ((data ?? []) as Array<
+    Pregunta & {
+      temas:
+        | { nombre: string; asignatura_id: string }
+        | Array<{ nombre: string; asignatura_id: string }>;
+    }
+  >).map((row) => {
+    const tema = Array.isArray(row.temas) ? row.temas[0] : row.temas;
+    return {
+      id: row.id,
+      tema_id: row.tema_id,
+      enunciado: row.enunciado,
+      opcion_a: row.opcion_a,
+      opcion_b: row.opcion_b,
+      opcion_c: row.opcion_c,
+      correcta: row.correcta,
+      justificacion: row.justificacion,
+      fuente: row.fuente,
+      created_at: row.created_at,
+      tema_nombre: tema?.nombre ?? "Sin tema",
+    };
+  });
+
+  return shuffled(flat).slice(0, n);
 }
 
 export async function getCorrectasByPreguntaIds(
@@ -495,7 +536,7 @@ export async function createTestWithRespuestas(
   payload: CreateTestWithRespuestasInput,
 ): Promise<{ id: string }> {
   const supabase = getSupabaseAdmin();
-  const { respuestas, ...testRow } = payload;
+  const { respuestas, tema_ids, ...testRow } = payload;
 
   const { data: test, error: testError } = await supabase
     .from("tests")
@@ -507,8 +548,24 @@ export async function createTestWithRespuestas(
     throw new Error(`createTestWithRespuestas/insert tests: ${testError.message}`);
   }
 
-  const rows = respuestas.map((respuesta) => ({ ...respuesta, test_id: test.id }));
-  const { error: respuestasError } = await supabase.from("test_respuestas").insert(rows);
+  if (tema_ids.length > 0) {
+    const temaRows = tema_ids.map((tema_id) => ({ test_id: test.id, tema_id }));
+    const { error: temasError } = await supabase.from("test_temas").insert(temaRows);
+    if (temasError) {
+      await supabase.from("tests").delete().eq("id", test.id);
+      throw new Error(
+        `createTestWithRespuestas/insert test_temas: ${temasError.message}`,
+      );
+    }
+  }
+
+  const respuestaRows = respuestas.map((respuesta) => ({
+    ...respuesta,
+    test_id: test.id,
+  }));
+  const { error: respuestasError } = await supabase
+    .from("test_respuestas")
+    .insert(respuestaRows);
 
   if (respuestasError) {
     await supabase.from("tests").delete().eq("id", test.id);
@@ -527,7 +584,7 @@ export async function getTestWithRespuestas(
   const { data: test, error: testError } = await supabase
     .from("tests")
     .select(
-      "id, fecha, modo, modalidad, asignatura_id, tema_id, penalizacion, timer_minutos, aciertos, fallos, blancos, nota, asignaturas!inner(nombre), temas(nombre)",
+      "id, fecha, modo, modalidad, asignatura_id, preguntas_por_test, penalizacion, timer_minutos, aciertos, fallos, blancos, nota, asignaturas!inner(nombre)",
     )
     .eq("id", testId)
     .maybeSingle();
@@ -535,26 +592,43 @@ export async function getTestWithRespuestas(
   if (testError) throw new Error(`getTestWithRespuestas/test: ${testError.message}`);
   if (!test) return null;
 
-  const { data: respuestas, error: respuestasError } = await supabase
-    .from("test_respuestas")
-    .select(
-      "id, test_id, pregunta_id, opcion_marcada, fue_dudosa, orden, preguntas!inner(id, tema_id, enunciado, opcion_a, opcion_b, opcion_c, correcta, created_at)",
-    )
-    .eq("test_id", testId)
-    .order("orden", { ascending: true });
+  const [
+    { data: temasRaw, error: temasError },
+    { data: respuestas, error: respuestasError },
+  ] = await Promise.all([
+    supabase
+      .from("test_temas")
+      .select("temas!inner(id, nombre, orden)")
+      .eq("test_id", testId),
+    supabase
+      .from("test_respuestas")
+      .select(
+        "id, test_id, pregunta_id, opcion_marcada, fue_dudosa, orden, preguntas!inner(id, tema_id, enunciado, opcion_a, opcion_b, opcion_c, correcta, justificacion, fuente, created_at, temas!inner(nombre))",
+      )
+      .eq("test_id", testId)
+      .order("orden", { ascending: true }),
+  ]);
 
+  if (temasError) throw new Error(`getTestWithRespuestas/temas: ${temasError.message}`);
   if (respuestasError) {
     throw new Error(`getTestWithRespuestas/respuestas: ${respuestasError.message}`);
   }
 
   const testRow = test as Test & {
     asignaturas: { nombre: string } | Array<{ nombre: string }>;
-    temas: { nombre: string } | Array<{ nombre: string }> | null;
   };
   const asignatura = Array.isArray(testRow.asignaturas)
     ? testRow.asignaturas[0]
     : testRow.asignaturas;
-  const tema = Array.isArray(testRow.temas) ? testRow.temas[0] : testRow.temas;
+
+  const temas = ((temasRaw ?? []) as Array<{
+    temas:
+      | { id: string; nombre: string; orden: number }
+      | Array<{ id: string; nombre: string; orden: number }>;
+  }>)
+    .map((row) => (Array.isArray(row.temas) ? row.temas[0] : row.temas))
+    .filter((t): t is { id: string; nombre: string; orden: number } => Boolean(t))
+    .sort((a, b) => a.orden - b.orden);
 
   return {
     id: testRow.id,
@@ -562,7 +636,7 @@ export async function getTestWithRespuestas(
     modo: testRow.modo,
     modalidad: testRow.modalidad,
     asignatura_id: testRow.asignatura_id,
-    tema_id: testRow.tema_id,
+    preguntas_por_test: testRow.preguntas_por_test,
     penalizacion: testRow.penalizacion,
     timer_minutos: testRow.timer_minutos,
     aciertos: testRow.aciertos,
@@ -570,13 +644,35 @@ export async function getTestWithRespuestas(
     blancos: testRow.blancos,
     nota: testRow.nota,
     asignatura_nombre: asignatura?.nombre ?? "Sin asignatura",
-    tema_nombre: tema?.nombre ?? null,
+    temas,
     respuestas: ((respuestas ?? []) as Array<
-      Omit<TestRespuestaDetalle, "pregunta"> & { preguntas: Pregunta | Array<Pregunta> }
+      Omit<TestRespuestaDetalle, "pregunta"> & {
+        preguntas:
+          | (Pregunta & { temas: { nombre: string } | Array<{ nombre: string }> })
+          | Array<
+              Pregunta & { temas: { nombre: string } | Array<{ nombre: string }> }
+            >;
+      }
     >).map((respuesta) => {
-      const pregunta = Array.isArray(respuesta.preguntas)
+      const preguntaRaw = Array.isArray(respuesta.preguntas)
         ? respuesta.preguntas[0]
         : respuesta.preguntas;
+      const tema = Array.isArray(preguntaRaw.temas)
+        ? preguntaRaw.temas[0]
+        : preguntaRaw.temas;
+      const pregunta: PreguntaConTema = {
+        id: preguntaRaw.id,
+        tema_id: preguntaRaw.tema_id,
+        enunciado: preguntaRaw.enunciado,
+        opcion_a: preguntaRaw.opcion_a,
+        opcion_b: preguntaRaw.opcion_b,
+        opcion_c: preguntaRaw.opcion_c,
+        correcta: preguntaRaw.correcta,
+        justificacion: preguntaRaw.justificacion,
+        fuente: preguntaRaw.fuente,
+        created_at: preguntaRaw.created_at,
+        tema_nombre: tema?.nombre ?? "Sin tema",
+      };
       return {
         id: respuesta.id,
         test_id: respuesta.test_id,

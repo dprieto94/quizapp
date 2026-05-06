@@ -74,6 +74,8 @@ export function PreguntaForm({
         opcion_b: fieldErrors.opcion_b?.[0],
         opcion_c: fieldErrors.opcion_c?.[0],
         correcta: fieldErrors.correcta?.[0],
+        justificacion: fieldErrors.justificacion?.[0],
+        fuente: fieldErrors.fuente?.[0],
       });
       return;
     }
@@ -171,6 +173,36 @@ export function PreguntaForm({
             ) : null}
           </div>
         ))}
+      </div>
+
+      <div>
+        <Label htmlFor="justificacion">Justificación (opcional)</Label>
+        <textarea
+          id="justificacion"
+          name="justificacion"
+          rows={3}
+          defaultValue={pregunta?.justificacion ?? ""}
+          className={textareaClass}
+          placeholder="Explicación corta de por qué la respuesta correcta es la correcta."
+          maxLength={4000}
+        />
+        {errors.justificacion ? (
+          <p className="mt-1 text-xs text-danger">{errors.justificacion}</p>
+        ) : null}
+      </div>
+
+      <div>
+        <Label htmlFor="fuente">Fuente (opcional)</Label>
+        <Input
+          id="fuente"
+          name="fuente"
+          defaultValue={pregunta?.fuente ?? ""}
+          placeholder="Libro, página, URL…"
+          maxLength={500}
+        />
+        {errors.fuente ? (
+          <p className="mt-1 text-xs text-danger">{errors.fuente}</p>
+        ) : null}
       </div>
 
       <fieldset>
