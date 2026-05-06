@@ -171,7 +171,7 @@ export default async function ResultadoPage({ params }: Props) {
                 <aside className="mt-4 rounded-r-lg border-l-4 border-primary bg-primary-soft/40 p-4">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <h3 className="flex items-center gap-2 text-sm font-semibold text-primary">
-                      <Lightbulb className="size-4" /> Justificación
+                      <Lightbulb className="size-4" aria-hidden="true" /> Justificación
                     </h3>
                     <span className="text-xs text-muted">
                       <span className="font-medium">Tema:</span>{" "}
