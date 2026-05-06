@@ -21,6 +21,9 @@ import type {
   ConfigUpdate,
   CorrectaPregunta,
   CreateTestWithRespuestasInput,
+  MediaPorAsignaturaItem,
+  Modalidad,
+  Modo,
   NewAsignatura,
   NewPregunta,
   NewTema,
@@ -33,6 +36,9 @@ import type {
   TemaWithCounts,
   Test,
   TestDetalle,
+  TestEvolucionPunto,
+  TestFilters,
+  TestListaItem,
   TestRespuestaDetalle,
   UpdateAsignatura,
   UpdatePregunta,
@@ -684,4 +690,145 @@ export async function getTestWithRespuestas(
       };
     }),
   };
+}
+
+export async function listTests(
+  filters: TestFilters = {},
+): Promise<TestListaItem[]> {
+  const supabase = getSupabaseAdmin();
+  let query = supabase
+    .from("tests")
+    .select(
+      "id, fecha, modo, modalidad, asignatura_id, preguntas_por_test, aciertos, fallos, blancos, nota, asignaturas!inner(nombre, orden), test_temas(temas!inner(id, nombre, orden))",
+    )
+    .order("fecha", { ascending: false });
+
+  if (filters.asignaturaId) query = query.eq("asignatura_id", filters.asignaturaId);
+  if (filters.modo) query = query.eq("modo", filters.modo);
+  if (filters.desde) query = query.gte("fecha", `${filters.desde}T00:00:00`);
+  if (filters.hasta) query = query.lte("fecha", `${filters.hasta}T23:59:59`);
+
+  const { data, error } = await query;
+  if (error) throw new Error(`listTests: ${error.message}`);
+
+  return ((data ?? []) as Array<{
+    id: string;
+    fecha: string;
+    modo: Modo;
+    modalidad: Modalidad;
+    asignatura_id: string;
+    preguntas_por_test: number;
+    aciertos: number;
+    fallos: number;
+    blancos: number;
+    nota: number | null;
+    asignaturas:
+      | { nombre: string; orden: number }
+      | Array<{ nombre: string; orden: number }>;
+    test_temas: Array<{
+      temas:
+        | { id: string; nombre: string; orden: number }
+        | Array<{ id: string; nombre: string; orden: number }>;
+    }>;
+  }>).map((row) => {
+    const asignatura = Array.isArray(row.asignaturas)
+      ? row.asignaturas[0]
+      : row.asignaturas;
+    const temas = (row.test_temas ?? [])
+      .map((tt) => (Array.isArray(tt.temas) ? tt.temas[0] : tt.temas))
+      .filter((t): t is { id: string; nombre: string; orden: number } => Boolean(t))
+      .sort((a, b) => a.orden - b.orden);
+
+    return {
+      id: row.id,
+      fecha: row.fecha,
+      modo: row.modo,
+      modalidad: row.modalidad,
+      asignatura_id: row.asignatura_id,
+      asignatura_nombre: asignatura?.nombre ?? "Sin asignatura",
+      asignatura_orden: asignatura?.orden ?? 0,
+      temas,
+      preguntas_por_test: row.preguntas_por_test,
+      aciertos: row.aciertos,
+      fallos: row.fallos,
+      blancos: row.blancos,
+      nota: row.nota,
+    };
+  });
+}
+
+export async function getMediaPorAsignaturaExamen(): Promise<MediaPorAsignaturaItem[]> {
+  const supabase = getSupabaseAdmin();
+  const [{ data: asignaturas, error: aErr }, { data: tests, error: tErr }] =
+    await Promise.all([
+      supabase.from("asignaturas").select("id, nombre, orden").order("orden"),
+      supabase
+        .from("tests")
+        .select("asignatura_id, nota")
+        .eq("modo", "examen")
+        .not("nota", "is", null),
+    ]);
+
+  if (aErr) throw new Error(`getMediaPorAsignaturaExamen/asignaturas: ${aErr.message}`);
+  if (tErr) throw new Error(`getMediaPorAsignaturaExamen/tests: ${tErr.message}`);
+
+  const buckets = new Map<string, number[]>();
+  for (const t of (tests ?? []) as Array<{ asignatura_id: string; nota: number }>) {
+    const arr = buckets.get(t.asignatura_id) ?? [];
+    arr.push(t.nota);
+    buckets.set(t.asignatura_id, arr);
+  }
+
+  return ((asignaturas ?? []) as Array<{
+    id: string;
+    nombre: string;
+    orden: number;
+  }>).map((a) => {
+    const notas = buckets.get(a.id) ?? [];
+    const media =
+      notas.length > 0
+        ? Math.round((notas.reduce((s, n) => s + n, 0) / notas.length) * 100) / 100
+        : 0;
+    return {
+      asignatura_id: a.id,
+      asignatura_nombre: a.nombre,
+      asignatura_orden: a.orden,
+      media,
+      n_tests: notas.length,
+    };
+  });
+}
+
+export async function getEvolucionExamen(limit = 20): Promise<TestEvolucionPunto[]> {
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from("tests")
+    .select("id, fecha, nota, modalidad, asignaturas!inner(nombre)")
+    .eq("modo", "examen")
+    .not("nota", "is", null)
+    .order("fecha", { ascending: false })
+    .limit(limit);
+
+  if (error) throw new Error(`getEvolucionExamen: ${error.message}`);
+
+  return ((data ?? []) as Array<{
+    id: string;
+    fecha: string;
+    nota: number;
+    modalidad: Modalidad;
+    asignaturas: { nombre: string } | Array<{ nombre: string }>;
+  }>)
+    .map((row) => {
+      const asignatura = Array.isArray(row.asignaturas)
+        ? row.asignaturas[0]
+        : row.asignaturas;
+      return {
+        test_id: row.id,
+        fecha: row.fecha,
+        nota: row.nota,
+        asignatura_nombre: asignatura?.nombre ?? "Sin asignatura",
+        modalidad: row.modalidad,
+      };
+    })
+    .reverse();
 }

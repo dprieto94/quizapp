@@ -136,3 +136,42 @@ export type TestDetalle = Test & {
   temas: Array<{ id: string; nombre: string; orden: number }>;
   respuestas: TestRespuestaDetalle[];
 };
+
+export type TestListaItem = {
+  id: string;
+  fecha: string;
+  modo: Modo;
+  modalidad: Modalidad;
+  asignatura_id: string;
+  asignatura_nombre: string;
+  asignatura_orden: number;
+  temas: Array<{ id: string; nombre: string; orden: number }>;
+  preguntas_por_test: number;
+  aciertos: number;
+  fallos: number;
+  blancos: number;
+  nota: number | null;
+};
+
+export type TestFilters = {
+  asignaturaId?: string;
+  modo?: Modo;
+  desde?: string;
+  hasta?: string;
+};
+
+export type MediaPorAsignaturaItem = {
+  asignatura_id: string;
+  asignatura_nombre: string;
+  asignatura_orden: number;
+  media: number;
+  n_tests: number;
+};
+
+export type TestEvolucionPunto = {
+  test_id: string;
+  fecha: string;
+  nota: number;
+  asignatura_nombre: string;
+  modalidad: Modalidad;
+};
