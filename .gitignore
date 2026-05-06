@@ -37,6 +37,9 @@ yarn-error.log*
 # local-only seeds (datos reales)
 db/*.local.sql
 
+# local-only scripts (paths privados, fuentes fuera del repo)
+scripts/import-preguntas.ts
+
 # vercel
 .vercel
 
