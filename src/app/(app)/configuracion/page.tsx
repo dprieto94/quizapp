@@ -1,5 +1,6 @@
 import { getConfig } from "@/lib/db";
 import { ConfigForm } from "./ConfigForm";
+import { ModosInfo } from "./ModosInfo";
 
 export default async function ConfiguracionPage() {
   const config = await getConfig();
@@ -14,6 +15,7 @@ export default async function ConfiguracionPage() {
         </p>
       </div>
       <ConfigForm config={config} />
+      <ModosInfo config={config} />
     </div>
   );
 }
