@@ -22,10 +22,6 @@ export function Timer({ minutos, onExpire }: Props) {
       setSecondsLeft((current) => {
         if (current <= 1) {
           window.clearInterval(id);
-          if (!expiredRef.current) {
-            expiredRef.current = true;
-            onExpireRef.current();
-          }
           return 0;
         }
         return current - 1;
@@ -34,6 +30,17 @@ export function Timer({ minutos, onExpire }: Props) {
 
     return () => window.clearInterval(id);
   }, []);
+
+  // Disparar onExpire en un effect separado, no dentro del updater de setState.
+  // Si lo llamáramos dentro del updater, React lo trataría como setState durante
+  // el render de Timer y disparaba el warning "Cannot update a component while
+  // rendering a different component".
+  useEffect(() => {
+    if (secondsLeft === 0 && !expiredRef.current) {
+      expiredRef.current = true;
+      onExpireRef.current();
+    }
+  }, [secondsLeft]);
 
   const minutes = Math.floor(secondsLeft / 60).toString().padStart(2, "0");
   const seconds = (secondsLeft % 60).toString().padStart(2, "0");
