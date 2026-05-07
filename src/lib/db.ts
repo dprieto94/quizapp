@@ -14,6 +14,7 @@
  * tipa entrada y salida desde @/types y respeta el patrón de errores.
  */
 import { getSupabaseAdmin } from "@/lib/supabase";
+import { shufflePregunta } from "@/lib/shuffle";
 import type {
   Asignatura,
   AsignaturaWithCounts,
@@ -533,7 +534,7 @@ export async function getTestWithRespuestas(
   const { data: test, error: testError } = await supabase
     .from("tests")
     .select(
-      "id, fecha, modo, modalidad, asignatura_id, user_id, preguntas_por_test, penalizacion, timer_minutos, aciertos, fallos, blancos, nota, asignaturas!inner(nombre)",
+      "id, fecha, modo, modalidad, asignatura_id, user_id, preguntas_por_test, penalizacion, timer_minutos, aciertos, fallos, blancos, nota, shuffle_seed, asignaturas!inner(nombre)",
     )
     .eq("id", testId)
     .maybeSingle();
@@ -579,6 +580,8 @@ export async function getTestWithRespuestas(
     .filter((t): t is { id: string; nombre: string; orden: number } => Boolean(t))
     .sort((a, b) => a.orden - b.orden);
 
+  const shuffleSeed = (testRow as Test).shuffle_seed;
+
   return {
     id: testRow.id,
     fecha: testRow.fecha,
@@ -593,6 +596,7 @@ export async function getTestWithRespuestas(
     fallos: testRow.fallos,
     blancos: testRow.blancos,
     nota: testRow.nota,
+    shuffle_seed: shuffleSeed,
     asignatura_nombre: asignatura?.nombre ?? "Sin asignatura",
     temas,
     respuestas: ((respuestas ?? []) as Array<
@@ -610,7 +614,7 @@ export async function getTestWithRespuestas(
       const tema = Array.isArray(preguntaRaw.temas)
         ? preguntaRaw.temas[0]
         : preguntaRaw.temas;
-      const pregunta: PreguntaConTema = {
+      const preguntaOriginal: PreguntaConTema = {
         id: preguntaRaw.id,
         tema_id: preguntaRaw.tema_id,
         enunciado: preguntaRaw.enunciado,
@@ -623,6 +627,10 @@ export async function getTestWithRespuestas(
         created_at: preguntaRaw.created_at,
         tema_nombre: tema?.nombre ?? "Sin tema",
       };
+      // Aplicar el shuffle del test para que la usuaria vea las opciones en
+      // el mismo orden en que las vio durante el test (legacy: si shuffle_seed
+      // es null la pregunta se devuelve sin tocar).
+      const pregunta = shufflePregunta(preguntaOriginal, shuffleSeed);
       return {
         id: respuesta.id,
         test_id: respuesta.test_id,

@@ -25,6 +25,7 @@ type Props = {
   preguntas: PreguntaPublica[];
   timerMinutos: number;
   correctas?: CorrectasMap;
+  testSeed: string;
 };
 
 export function TestRunner({
@@ -35,6 +36,7 @@ export function TestRunner({
   preguntas,
   timerMinutos,
   correctas,
+  testSeed,
 }: Props) {
   const isEstudio = modo === "estudio";
   const [respuestas, setRespuestas] = useState<RespuestaEntrega[]>(() =>
@@ -100,6 +102,7 @@ export function TestRunner({
         temaIds,
         modo,
         modalidad,
+        testSeed,
         respuestas: respuestasRef.current,
       });
     });

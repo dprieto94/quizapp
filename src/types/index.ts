@@ -56,6 +56,7 @@ export type Test = {
   fallos: number;
   blancos: number;
   nota: number | null;
+  shuffle_seed: string | null;
 };
 
 export type TestRespuesta = {

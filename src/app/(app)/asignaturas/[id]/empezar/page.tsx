@@ -9,6 +9,7 @@ import {
   getRandomPreguntasByAsignatura,
   getRandomPreguntasByTemas,
 } from "@/lib/db";
+import { shufflePregunta } from "@/lib/shuffle";
 import type { Modalidad, Modo, PreguntaPublica } from "@/types";
 
 type Props = {
@@ -71,20 +72,26 @@ export default async function EmpezarPage({ params, searchParams }: Props) {
     );
   }
 
-  const publicPreguntas: PreguntaPublica[] = preguntas.map((pregunta) => ({
-    id: pregunta.id,
-    tema_id: pregunta.tema_id,
-    enunciado: pregunta.enunciado,
-    opcion_a: pregunta.opcion_a,
-    opcion_b: pregunta.opcion_b,
-    opcion_c: pregunta.opcion_c,
-    justificacion: pregunta.justificacion,
-    fuente: pregunta.fuente,
-    tema_nombre: pregunta.tema_nombre,
+  // Seed por test: neutraliza el sesgo posicional a/b/c del banco generado por
+  // LLM. Se propaga a TestRunner → action y se persiste en `tests.shuffle_seed`
+  // para que la pantalla de resultado pueda reconstruir el mismo orden.
+  const testSeed = crypto.randomUUID();
+  const preguntasShuffleadas = preguntas.map((p) => shufflePregunta(p, testSeed));
+
+  const publicPreguntas: PreguntaPublica[] = preguntasShuffleadas.map((p) => ({
+    id: p.id,
+    tema_id: p.tema_id,
+    enunciado: p.enunciado,
+    opcion_a: p.opcion_a,
+    opcion_b: p.opcion_b,
+    opcion_c: p.opcion_c,
+    justificacion: p.justificacion,
+    fuente: p.fuente,
+    tema_nombre: p.tema_nombre,
   }));
   const correctas =
     modo === "estudio"
-      ? Object.fromEntries(preguntas.map((p) => [p.id, p.correcta]))
+      ? Object.fromEntries(preguntasShuffleadas.map((p) => [p.id, p.correcta]))
       : undefined;
 
   return (
@@ -96,6 +103,7 @@ export default async function EmpezarPage({ params, searchParams }: Props) {
       preguntas={publicPreguntas}
       timerMinutos={modo === "examen" ? config.timer_minutos : 0}
       correctas={correctas}
+      testSeed={testSeed}
     />
   );
 }

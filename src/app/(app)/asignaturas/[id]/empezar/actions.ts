@@ -9,6 +9,7 @@ import {
   getCorrectasByPreguntaIds,
 } from "@/lib/db";
 import { calcularNota } from "@/lib/scoring";
+import { correctaTrasShuffle } from "@/lib/shuffle";
 
 const respuestaSchema = z.object({
   pregunta_id: z.string().uuid(),
@@ -22,6 +23,7 @@ const payloadSchema = z.object({
   temaIds: z.array(z.string().uuid()).max(50),
   modo: z.enum(["examen", "estudio"]),
   modalidad: z.enum(["temas", "asignatura"]),
+  testSeed: z.string().uuid(),
   respuestas: z.array(respuestaSchema).min(1).max(30),
 });
 
@@ -32,7 +34,7 @@ export async function finalizarTest(input: unknown) {
   const parsed = payloadSchema.safeParse(input);
   if (!parsed.success) throw new Error("Payload de test inválido");
 
-  const { asignaturaId, temaIds, modo, modalidad, respuestas } = parsed.data;
+  const { asignaturaId, temaIds, modo, modalidad, testSeed, respuestas } = parsed.data;
   if (modalidad === "temas" && temaIds.length === 0) {
     throw new Error("Modalidad 'temas' requiere al menos un tema seleccionado");
   }
@@ -60,8 +62,16 @@ export async function finalizarTest(input: unknown) {
       throw new Error("Pregunta fuera de los temas seleccionados");
     }
 
+    // La letra correcta tras el shuffle aplicado al renderizar el test —
+    // que es la que la usuaria realmente vio y pulsó.
+    const correctaShuffled = correctaTrasShuffle(
+      pregunta.id,
+      pregunta.correcta,
+      testSeed,
+    );
+
     if (respuesta.opcion_marcada === null) blancos++;
-    else if (respuesta.opcion_marcada === pregunta.correcta) aciertos++;
+    else if (respuesta.opcion_marcada === correctaShuffled) aciertos++;
     else fallos++;
   }
 
@@ -83,6 +93,7 @@ export async function finalizarTest(input: unknown) {
     fallos,
     blancos,
     nota,
+    shuffle_seed: testSeed,
     tema_ids: modalidad === "temas" ? temaIds : [],
     respuestas,
   });
