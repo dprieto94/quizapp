@@ -34,6 +34,12 @@ yarn-error.log*
 .env*
 !.env.example
 
+# local-only seeds (datos reales)
+db/*.local.sql
+
+# local-only scripts (paths privados, fuentes fuera del repo)
+scripts/import-preguntas.ts
+
 # vercel
 .vercel
 
@@ -43,3 +49,9 @@ next-env.d.ts
 
 # Claude Code local config
 .claude/
+
+# UI playground (no se commitea, vive solo en local)
+src/app/dev-ui/
+
+# Data smoke test (no se commitea, vive solo en local)
+src/app/dev-data/
