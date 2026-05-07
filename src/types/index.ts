@@ -67,10 +67,6 @@ export type TestRespuesta = {
   orden: number;
 };
 
-export type NewAsignatura = { nombre: string; orden?: number };
-export type UpdateAsignatura = Partial<Pick<Asignatura, "nombre" | "orden">>;
-export type NewTema = { asignatura_id: string; nombre: string; orden?: number };
-export type UpdateTema = Partial<Pick<Tema, "asignatura_id" | "nombre" | "orden">>;
 export type NewPregunta = Omit<Pregunta, "id" | "created_at">;
 export type UpdatePregunta = Partial<Omit<Pregunta, "id" | "created_at">>;
 export type NewTest = Omit<Test, "id" | "fecha">;

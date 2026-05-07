@@ -24,9 +24,7 @@ import type {
   MediaPorAsignaturaItem,
   Modalidad,
   Modo,
-  NewAsignatura,
   NewPregunta,
-  NewTema,
   Pregunta,
   PreguntaConTema,
   PreguntaFilters,
@@ -40,9 +38,7 @@ import type {
   TestFilters,
   TestListaItem,
   TestRespuestaDetalle,
-  UpdateAsignatura,
   UpdatePregunta,
-  UpdateTema,
 } from "@/types";
 
 function shuffled<T>(items: T[]): T[] {
@@ -177,71 +173,6 @@ export async function updateConfig(
   return data;
 }
 
-async function getNextAsignaturaOrden(): Promise<number> {
-  const supabase = getSupabaseAdmin();
-  const { data, error } = await supabase
-    .from("asignaturas")
-    .select("orden")
-    .order("orden", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (error) throw new Error(`getNextAsignaturaOrden: ${error.message}`);
-  return ((data as { orden: number } | null)?.orden ?? 0) + 1;
-}
-
-async function getNextTemaOrden(asignaturaId: string): Promise<number> {
-  const supabase = getSupabaseAdmin();
-  const { data, error } = await supabase
-    .from("temas")
-    .select("orden")
-    .eq("asignatura_id", asignaturaId)
-    .order("orden", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (error) throw new Error(`getNextTemaOrden: ${error.message}`);
-  return ((data as { orden: number } | null)?.orden ?? 0) + 1;
-}
-
-export async function createAsignatura(input: NewAsignatura): Promise<Asignatura> {
-  const supabase = getSupabaseAdmin();
-  const payload = {
-    nombre: input.nombre,
-    orden: input.orden ?? (await getNextAsignaturaOrden()),
-  };
-  const { data, error } = await supabase
-    .from("asignaturas")
-    .insert(payload)
-    .select("id, nombre, orden")
-    .single();
-
-  if (error) throw new Error(`createAsignatura: ${error.message}`);
-  return data;
-}
-
-export async function updateAsignatura(
-  id: string,
-  patch: UpdateAsignatura,
-): Promise<Asignatura> {
-  const supabase = getSupabaseAdmin();
-  const { data, error } = await supabase
-    .from("asignaturas")
-    .update(patch)
-    .eq("id", id)
-    .select("id, nombre, orden")
-    .single();
-
-  if (error) throw new Error(`updateAsignatura: ${error.message}`);
-  return data;
-}
-
-export async function deleteAsignatura(id: string): Promise<void> {
-  const supabase = getSupabaseAdmin();
-  const { error } = await supabase.from("asignaturas").delete().eq("id", id);
-  if (error) throw new Error(`deleteAsignatura: ${error.message}`);
-}
-
 export async function countTemasYPreguntasByAsignatura(
   id: string,
 ): Promise<{ temas: number; preguntas: number }> {
@@ -305,42 +236,6 @@ export async function listTemasWithCounts(): Promise<TemaWithCounts[]> {
   );
 
   return withCounts;
-}
-
-export async function createTema(input: NewTema): Promise<Tema> {
-  const supabase = getSupabaseAdmin();
-  const payload = {
-    asignatura_id: input.asignatura_id,
-    nombre: input.nombre,
-    orden: input.orden ?? (await getNextTemaOrden(input.asignatura_id)),
-  };
-  const { data, error } = await supabase
-    .from("temas")
-    .insert(payload)
-    .select("id, asignatura_id, nombre, orden")
-    .single();
-
-  if (error) throw new Error(`createTema: ${error.message}`);
-  return data;
-}
-
-export async function updateTema(id: string, patch: UpdateTema): Promise<Tema> {
-  const supabase = getSupabaseAdmin();
-  const { data, error } = await supabase
-    .from("temas")
-    .update(patch)
-    .eq("id", id)
-    .select("id, asignatura_id, nombre, orden")
-    .single();
-
-  if (error) throw new Error(`updateTema: ${error.message}`);
-  return data;
-}
-
-export async function deleteTema(id: string): Promise<void> {
-  const supabase = getSupabaseAdmin();
-  const { error } = await supabase.from("temas").delete().eq("id", id);
-  if (error) throw new Error(`deleteTema: ${error.message}`);
 }
 
 export async function countPreguntasByTema(id: string): Promise<number> {

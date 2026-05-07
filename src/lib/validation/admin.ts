@@ -1,30 +1,10 @@
 import { z } from "zod";
 
-const optionalOrden = z.preprocess(
-  (value) => (value === "" || value == null ? undefined : value),
-  z.coerce.number().int().min(1).max(999).optional(),
-);
-
 const optionalLongText = (max: number) =>
   z.preprocess(
     (value) => (typeof value === "string" && value.trim() === "" ? null : value),
     z.string().max(max).nullable(),
   );
-
-export const asignaturaSchema = z.object({
-  nombre: z.string().trim().min(1, "Obligatorio").max(100),
-  orden: optionalOrden,
-});
-
-export const asignaturaUpdateSchema = asignaturaSchema.partial();
-
-export const temaSchema = z.object({
-  asignatura_id: z.string().uuid(),
-  nombre: z.string().trim().min(1, "Obligatorio").max(100),
-  orden: optionalOrden,
-});
-
-export const temaUpdateSchema = temaSchema.partial();
 
 export const preguntaSchema = z.object({
   tema_id: z.string().uuid(),

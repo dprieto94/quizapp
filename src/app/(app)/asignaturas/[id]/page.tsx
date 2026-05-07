@@ -29,7 +29,7 @@ export default async function AsignaturaPage({ params }: Props) {
         </Link>
         <h1 className="mt-3 text-3xl font-semibold">{asignatura.nombre}</h1>
         <p className="mt-2 text-muted">
-          Configura el test. Si todavía no hay preguntas, se mostrará un aviso antes de empezar.
+          Configura el test que quieres hacer.
         </p>
       </div>
 

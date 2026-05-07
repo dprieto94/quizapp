@@ -77,7 +77,7 @@ export function StartTestForm({
             <span>
               <strong>Selección de temas</strong>
               <span className="mt-1 block text-sm text-muted">
-                Elige uno o varios temas con los checkboxes.
+                Elige uno o varios temas.
               </span>
             </span>
           </label>
@@ -173,8 +173,8 @@ export function StartTestForm({
             <span>
               <strong>Estudio</strong>
               <span className="mt-1 block text-sm text-muted">
-                Sin timer, feedback inmediato pregunta a pregunta. Sin nota — porcentaje
-                de aciertos.
+                Sin timer, feedback inmediato pregunta a pregunta. Sin nota y con el
+                porcentaje de aciertos.
               </span>
             </span>
           </label>

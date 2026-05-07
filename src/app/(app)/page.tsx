@@ -11,7 +11,7 @@ export default async function Home() {
         <h1 className="text-3xl font-semibold">Asignaturas</h1>
         <div className="mt-2 h-1 w-12 rounded-full bg-primary" />
         <p className="mt-3 text-muted">
-          Elige una asignatura para preparar un test en modo examen.
+          Elige una asignatura para preparar un test.
         </p>
       </div>
 
