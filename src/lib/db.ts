@@ -139,25 +139,28 @@ export async function getTema(id: string): Promise<Tema | null> {
   return data;
 }
 
-export async function getConfig(): Promise<Config> {
+export async function getConfig(userId: string): Promise<Config> {
   const supabase = getSupabaseAdmin();
   const { data, error } = await supabase
     .from("config")
-    .select("id, penalizacion, timer_minutos, preguntas_por_test")
-    .eq("id", 1)
+    .select("user_id, penalizacion, timer_minutos, preguntas_por_test")
+    .eq("user_id", userId)
     .single();
 
   if (error) throw new Error(`getConfig: ${error.message}`);
   return data;
 }
 
-export async function updateConfig(payload: ConfigUpdate): Promise<Config> {
+export async function updateConfig(
+  userId: string,
+  payload: ConfigUpdate,
+): Promise<Config> {
   const supabase = getSupabaseAdmin();
   const { data, error } = await supabase
     .from("config")
     .update(payload)
-    .eq("id", 1)
-    .select("id, penalizacion, timer_minutos, preguntas_por_test")
+    .eq("user_id", userId)
+    .select("user_id, penalizacion, timer_minutos, preguntas_por_test")
     .single();
 
   if (error) throw new Error(`updateConfig: ${error.message}`);
@@ -590,7 +593,7 @@ export async function getTestWithRespuestas(
   const { data: test, error: testError } = await supabase
     .from("tests")
     .select(
-      "id, fecha, modo, modalidad, asignatura_id, preguntas_por_test, penalizacion, timer_minutos, aciertos, fallos, blancos, nota, asignaturas!inner(nombre)",
+      "id, fecha, modo, modalidad, asignatura_id, user_id, preguntas_por_test, penalizacion, timer_minutos, aciertos, fallos, blancos, nota, asignaturas!inner(nombre)",
     )
     .eq("id", testId)
     .maybeSingle();
@@ -642,6 +645,7 @@ export async function getTestWithRespuestas(
     modo: testRow.modo,
     modalidad: testRow.modalidad,
     asignatura_id: testRow.asignatura_id,
+    user_id: testRow.user_id,
     preguntas_por_test: testRow.preguntas_por_test,
     penalizacion: testRow.penalizacion,
     timer_minutos: testRow.timer_minutos,
@@ -693,7 +697,8 @@ export async function getTestWithRespuestas(
 }
 
 export async function listTests(
-  filters: TestFilters = {},
+  filters: TestFilters,
+  userId: string,
 ): Promise<TestListaItem[]> {
   const supabase = getSupabaseAdmin();
   let query = supabase
@@ -701,6 +706,7 @@ export async function listTests(
     .select(
       "id, fecha, modo, modalidad, asignatura_id, preguntas_por_test, aciertos, fallos, blancos, nota, asignaturas!inner(nombre, orden), test_temas(temas!inner(id, nombre, orden))",
     )
+    .eq("user_id", userId)
     .order("fecha", { ascending: false });
 
   if (filters.asignaturaId) query = query.eq("asignatura_id", filters.asignaturaId);
@@ -757,7 +763,9 @@ export async function listTests(
   });
 }
 
-export async function getMediaPorAsignaturaExamen(): Promise<MediaPorAsignaturaItem[]> {
+export async function getMediaPorAsignaturaExamen(
+  userId: string,
+): Promise<MediaPorAsignaturaItem[]> {
   const supabase = getSupabaseAdmin();
   const [{ data: asignaturas, error: aErr }, { data: tests, error: tErr }] =
     await Promise.all([
@@ -765,6 +773,7 @@ export async function getMediaPorAsignaturaExamen(): Promise<MediaPorAsignaturaI
       supabase
         .from("tests")
         .select("asignatura_id, nota")
+        .eq("user_id", userId)
         .eq("modo", "examen")
         .not("nota", "is", null),
     ]);
@@ -799,11 +808,15 @@ export async function getMediaPorAsignaturaExamen(): Promise<MediaPorAsignaturaI
   });
 }
 
-export async function getEvolucionExamen(limit = 20): Promise<TestEvolucionPunto[]> {
+export async function getEvolucionExamen(
+  userId: string,
+  limit = 20,
+): Promise<TestEvolucionPunto[]> {
   const supabase = getSupabaseAdmin();
   const { data, error } = await supabase
     .from("tests")
     .select("id, fecha, nota, modalidad, asignaturas!inner(nombre)")
+    .eq("user_id", userId)
     .eq("modo", "examen")
     .not("nota", "is", null)
     .order("fecha", { ascending: false })

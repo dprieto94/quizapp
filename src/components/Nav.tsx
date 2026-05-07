@@ -12,7 +12,11 @@ const LINKS = [
   { href: "/admin/preguntas", label: "Admin", matchPrefix: "/admin" },
 ];
 
-export function Nav() {
+type Props = {
+  username: string;
+};
+
+export function Nav({ username }: Props) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
@@ -46,6 +50,9 @@ export function Nav() {
               {link.label}
             </Link>
           ))}
+          <span className="hidden md:inline text-xs text-muted">
+            Conectado como <strong className="text-foreground">{username}</strong>
+          </span>
           <form action="/api/auth/logout" method="POST">
             <button type="submit" className="text-muted hover:text-danger">
               Salir
@@ -77,6 +84,9 @@ export function Nav() {
           className="sm:hidden border-t border-border bg-background"
         >
           <ul className="max-w-5xl mx-auto px-4 py-2 flex flex-col text-sm">
+            <li className="border-b border-border py-3 text-xs text-muted">
+              Conectado como <strong className="text-foreground">{username}</strong>
+            </li>
             {LINKS.map((link) => (
               <li key={link.href}>
                 <Link

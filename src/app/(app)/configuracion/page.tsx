@@ -1,9 +1,14 @@
+import { redirect } from "next/navigation";
+import { getSession } from "@/lib/auth";
 import { getConfig } from "@/lib/db";
 import { ConfigForm } from "./ConfigForm";
 import { ModosInfo } from "./ModosInfo";
 
 export default async function ConfiguracionPage() {
-  const config = await getConfig();
+  const session = await getSession();
+  if (!session) redirect("/login");
+
+  const config = await getConfig(session.userId);
 
   return (
     <div className="space-y-6">

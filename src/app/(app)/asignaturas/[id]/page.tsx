@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
+import { getSession } from "@/lib/auth";
 import { getAsignatura, getConfig, listTemasByAsignatura } from "@/lib/db";
 import { StartTestForm } from "./StartTestForm";
 
@@ -9,10 +10,13 @@ type Props = {
 
 export default async function AsignaturaPage({ params }: Props) {
   const { id } = await params;
+  const session = await getSession();
+  if (!session) redirect("/login");
+
   const [asignatura, temas, config] = await Promise.all([
     getAsignatura(id),
     listTemasByAsignatura(id),
-    getConfig(),
+    getConfig(session.userId),
   ]);
 
   if (!asignatura) notFound();

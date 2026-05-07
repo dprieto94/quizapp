@@ -1,12 +1,17 @@
+import { redirect } from "next/navigation";
 import { Card } from "@/components/ui/Card";
 import { EvolucionChart } from "@/components/historico/charts/EvolucionChart";
 import { MediaPorAsignaturaChart } from "@/components/historico/charts/MediaPorAsignaturaChart";
+import { getSession } from "@/lib/auth";
 import { getEvolucionExamen, getMediaPorAsignaturaExamen } from "@/lib/db";
 
 export default async function EstadisticasPage() {
+  const session = await getSession();
+  if (!session) redirect("/login");
+
   const [media, evolucion] = await Promise.all([
-    getMediaPorAsignaturaExamen(),
-    getEvolucionExamen(20),
+    getMediaPorAsignaturaExamen(session.userId),
+    getEvolucionExamen(session.userId, 20),
   ]);
 
   const totalExamenTests = media.reduce((sum, m) => sum + m.n_tests, 0);

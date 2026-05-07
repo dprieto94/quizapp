@@ -1,3 +1,5 @@
+import { redirect } from "next/navigation";
+import { getSession } from "@/lib/auth";
 import { listAsignaturas, listTests } from "@/lib/db";
 import { HistoricoFilters } from "@/components/historico/HistoricoFilters";
 import { HistoricoLista } from "@/components/historico/HistoricoLista";
@@ -13,6 +15,9 @@ type Props = {
 };
 
 export default async function HistoricoPage({ searchParams }: Props) {
+  const session = await getSession();
+  if (!session) redirect("/login");
+
   const sp = await searchParams;
   const modo: Modo | undefined =
     sp.modo === "examen" || sp.modo === "estudio" ? sp.modo : undefined;
@@ -25,7 +30,7 @@ export default async function HistoricoPage({ searchParams }: Props) {
 
   const [asignaturas, tests] = await Promise.all([
     listAsignaturas(),
-    listTests(filters),
+    listTests(filters, session.userId),
   ]);
 
   return (

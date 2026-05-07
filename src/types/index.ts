@@ -10,7 +10,7 @@ export type User = {
 };
 
 export type Config = {
-  id: number;
+  user_id: string;
   penalizacion: number;
   timer_minutos: number;
   preguntas_por_test: number;
@@ -48,6 +48,7 @@ export type Test = {
   modo: Modo;
   modalidad: Modalidad;
   asignatura_id: string;
+  user_id: string;
   preguntas_por_test: number;
   penalizacion: number;
   timer_minutos: number | null;

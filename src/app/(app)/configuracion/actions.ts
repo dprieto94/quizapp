@@ -17,7 +17,7 @@ export async function updateConfigAction(formData: FormData): Promise<ActionResu
       timer_minutos: formData.get("timer_minutos"),
       preguntas_por_test: formData.get("preguntas_por_test"),
     });
-    await updateConfig(input);
+    await updateConfig(session.userId, input);
     revalidatePath("/configuracion");
     revalidatePath("/");
     return { ok: true };

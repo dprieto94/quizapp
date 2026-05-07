@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Card } from "@/components/ui/Card";
 import { TestRunner } from "@/components/test/TestRunner";
+import { getSession } from "@/lib/auth";
 import {
   getAsignatura,
   getConfig,
@@ -17,6 +18,9 @@ type Props = {
 
 export default async function EmpezarPage({ params, searchParams }: Props) {
   const { id } = await params;
+  const session = await getSession();
+  if (!session) redirect("/login");
+
   const sp = await searchParams;
   const modalidad: Modalidad = sp.modalidad === "asignatura" ? "asignatura" : "temas";
   const modo: Modo = sp.modo === "estudio" ? "estudio" : "examen";
@@ -33,7 +37,7 @@ export default async function EmpezarPage({ params, searchParams }: Props) {
   const asignatura = await getAsignatura(id);
   if (!asignatura) redirect("/");
 
-  const config = await getConfig();
+  const config = await getConfig(session.userId);
 
   const preguntas =
     modalidad === "temas"

@@ -12,7 +12,7 @@ export default async function AppLayout({
 
   return (
     <>
-      <Nav />
+      <Nav username={session.username} />
       <main className="max-w-5xl mx-auto p-4 flex-1">{children}</main>
     </>
   );

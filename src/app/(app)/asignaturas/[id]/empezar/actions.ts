@@ -65,13 +65,14 @@ export async function finalizarTest(input: unknown) {
     else fallos++;
   }
 
-  const config = await getConfig();
+  const config = await getConfig(session.userId);
   const nota =
     modo === "examen"
       ? calcularNota(aciertos, fallos, config.penalizacion, respuestas.length)
       : null;
 
   const { id } = await createTestWithRespuestas({
+    user_id: session.userId,
     modo,
     modalidad,
     asignatura_id: asignaturaId,

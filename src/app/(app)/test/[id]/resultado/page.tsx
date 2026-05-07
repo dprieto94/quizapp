@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Badge } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
+import { getSession } from "@/lib/auth";
 import { cn } from "@/lib/cn";
 import { getTestWithRespuestas } from "@/lib/db";
 import type { Opcion, TestRespuestaDetalle } from "@/types";
@@ -50,8 +51,11 @@ function OptionLine({
 
 export default async function ResultadoPage({ params }: Props) {
   const { id } = await params;
+  const session = await getSession();
+  if (!session) notFound();
+
   const test = await getTestWithRespuestas(id);
-  if (!test) notFound();
+  if (!test || test.user_id !== session.userId) notFound();
 
   const total = test.aciertos + test.fallos + test.blancos;
   const porcentaje = total ? Math.round((test.aciertos / total) * 100) : 0;
