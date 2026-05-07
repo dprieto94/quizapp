@@ -67,38 +67,48 @@ export async function listAsignaturas(): Promise<Asignatura[]> {
 
 export async function listAsignaturasWithCounts(): Promise<AsignaturaWithCounts[]> {
   const supabase = getSupabaseAdmin();
-  const [{ data: asignaturas, error: asignaturasError }, { data: temas, error: temasError }, { data: preguntas, error: preguntasError }] =
-    await Promise.all([
-      supabase.from("asignaturas").select("id, nombre, orden").order("orden", { ascending: true }),
-      supabase.from("temas").select("id, asignatura_id"),
-      supabase.from("preguntas").select("id, temas!inner(asignatura_id)"),
-    ]);
+  const { data: asignaturas, error: asignaturasError } = await supabase
+    .from("asignaturas")
+    .select("id, nombre, orden")
+    .order("orden", { ascending: true });
 
   if (asignaturasError) {
     throw new Error(`listAsignaturasWithCounts: ${asignaturasError.message}`);
   }
-  if (temasError) throw new Error(`listAsignaturasWithCounts: ${temasError.message}`);
-  if (preguntasError) {
-    throw new Error(`listAsignaturasWithCounts: ${preguntasError.message}`);
-  }
 
-  const temasCount = new Map<string, number>();
-  for (const tema of (temas ?? []) as Array<{ asignatura_id: string }>) {
-    temasCount.set(tema.asignatura_id, (temasCount.get(tema.asignatura_id) ?? 0) + 1);
-  }
+  // Una query de count por asignatura (head:true → no devuelve filas, solo el total).
+  // Evita el max-rows default de Supabase (1000) que recortaría los conteos cuando hay
+  // muchos preguntas (>1000) en BBDD.
+  const withCounts = await Promise.all(
+    ((asignaturas ?? []) as Asignatura[]).map(async (asignatura) => {
+      const [{ count: temasCount, error: temasError }, { count: preguntasCount, error: preguntasError }] =
+        await Promise.all([
+          supabase
+            .from("temas")
+            .select("id", { count: "exact", head: true })
+            .eq("asignatura_id", asignatura.id),
+          supabase
+            .from("preguntas")
+            .select("id, temas!inner(asignatura_id)", { count: "exact", head: true })
+            .eq("temas.asignatura_id", asignatura.id),
+        ]);
 
-  const preguntasCount = new Map<string, number>();
-  for (const pregunta of (preguntas ?? []) as Array<{ temas: { asignatura_id: string } | Array<{ asignatura_id: string }> }>) {
-    const tema = Array.isArray(pregunta.temas) ? pregunta.temas[0] : pregunta.temas;
-    if (!tema) continue;
-    preguntasCount.set(tema.asignatura_id, (preguntasCount.get(tema.asignatura_id) ?? 0) + 1);
-  }
+      if (temasError) {
+        throw new Error(`listAsignaturasWithCounts/temas: ${temasError.message}`);
+      }
+      if (preguntasError) {
+        throw new Error(`listAsignaturasWithCounts/preguntas: ${preguntasError.message}`);
+      }
 
-  return ((asignaturas ?? []) as Asignatura[]).map((asignatura) => ({
-    ...asignatura,
-    temas_count: temasCount.get(asignatura.id) ?? 0,
-    preguntas_count: preguntasCount.get(asignatura.id) ?? 0,
-  }));
+      return {
+        ...asignatura,
+        temas_count: temasCount ?? 0,
+        preguntas_count: preguntasCount ?? 0,
+      };
+    }),
+  );
+
+  return withCounts;
 }
 
 export async function getAsignatura(id: string): Promise<Asignatura | null> {
@@ -279,20 +289,22 @@ export async function listTemasWithAsignatura(): Promise<TemaWithAsignatura[]> {
 
 export async function listTemasWithCounts(): Promise<TemaWithCounts[]> {
   const supabase = getSupabaseAdmin();
-  const [temas, preguntasResult] = await Promise.all([
-    listTemasWithAsignatura(),
-    supabase.from("preguntas").select("id, tema_id"),
-  ]);
+  const temas = await listTemasWithAsignatura();
 
-  const { data: preguntas, error } = preguntasResult;
-  if (error) throw new Error(`listTemasWithCounts: ${error.message}`);
+  // Una query de count por tema (head:true → no devuelve filas, solo el total).
+  // Evita el max-rows default de Supabase (1000) que recortaría conteos con muchas preguntas.
+  const withCounts = await Promise.all(
+    temas.map(async (tema) => {
+      const { count, error } = await supabase
+        .from("preguntas")
+        .select("id", { count: "exact", head: true })
+        .eq("tema_id", tema.id);
+      if (error) throw new Error(`listTemasWithCounts: ${error.message}`);
+      return { ...tema, preguntas_count: count ?? 0 };
+    }),
+  );
 
-  const counts = new Map<string, number>();
-  for (const pregunta of (preguntas ?? []) as Array<{ tema_id: string }>) {
-    counts.set(pregunta.tema_id, (counts.get(pregunta.tema_id) ?? 0) + 1);
-  }
-
-  return temas.map((tema) => ({ ...tema, preguntas_count: counts.get(tema.id) ?? 0 }));
+  return withCounts;
 }
 
 export async function createTema(input: NewTema): Promise<Tema> {
@@ -346,21 +358,32 @@ export async function listPreguntas(
   filters: PreguntaFilters = {},
 ): Promise<PreguntaWithContext[]> {
   const supabase = getSupabaseAdmin();
-  let query = supabase
-    .from("preguntas")
-    .select(
-      "id, tema_id, enunciado, opcion_a, opcion_b, opcion_c, correcta, justificacion, fuente, created_at, temas!inner(nombre, asignatura_id, asignaturas!inner(nombre))",
-    )
-    .order("created_at", { ascending: false });
+  // Paginación manual en chunks de 1000 para sortear el max-rows default de Supabase.
+  // Para casos con filtros la primera página suele ser suficiente, pero el bucle se
+  // mantiene por seguridad si el banco crece >1000 preguntas en una sola asignatura.
+  const PAGE = 1000;
+  const all: unknown[] = [];
+  for (let offset = 0; ; offset += PAGE) {
+    let query = supabase
+      .from("preguntas")
+      .select(
+        "id, tema_id, enunciado, opcion_a, opcion_b, opcion_c, correcta, justificacion, fuente, created_at, temas!inner(nombre, asignatura_id, asignaturas!inner(nombre))",
+      )
+      .order("created_at", { ascending: false })
+      .range(offset, offset + PAGE - 1);
 
-  if (filters.temaId) query = query.eq("tema_id", filters.temaId);
-  if (filters.asignaturaId) query = query.eq("temas.asignatura_id", filters.asignaturaId);
-  if (filters.q?.trim()) query = query.ilike("enunciado", `%${filters.q.trim()}%`);
+    if (filters.temaId) query = query.eq("tema_id", filters.temaId);
+    if (filters.asignaturaId) query = query.eq("temas.asignatura_id", filters.asignaturaId);
+    if (filters.q?.trim()) query = query.ilike("enunciado", `%${filters.q.trim()}%`);
 
-  const { data, error } = await query;
-  if (error) throw new Error(`listPreguntas: ${error.message}`);
+    const { data, error } = await query;
+    if (error) throw new Error(`listPreguntas: ${error.message}`);
+    if (!data?.length) break;
+    all.push(...data);
+    if (data.length < PAGE) break;
+  }
 
-  return ((data ?? []) as Array<
+  return (all as Array<
     Pregunta & {
       temas: {
         nombre: string;
@@ -442,16 +465,27 @@ export async function getRandomPreguntasByTemas(
 ): Promise<PreguntaConTema[]> {
   if (!temaIds.length) return [];
   const supabase = getSupabaseAdmin();
-  const { data, error } = await supabase
-    .from("preguntas")
-    .select(
-      "id, tema_id, enunciado, opcion_a, opcion_b, opcion_c, correcta, justificacion, fuente, created_at, temas!inner(nombre)",
-    )
-    .in("tema_id", temaIds);
 
-  if (error) throw new Error(`getRandomPreguntasByTemas: ${error.message}`);
+  // Paginación manual en chunks de 1000 para sortear el max-rows default de Supabase.
+  // Garantiza que si los temas seleccionados suman >1000 preguntas todas entran al
+  // barajado, en vez de quedar recortadas silenciosamente.
+  const PAGE = 1000;
+  const allRaw: unknown[] = [];
+  for (let offset = 0; ; offset += PAGE) {
+    const { data, error } = await supabase
+      .from("preguntas")
+      .select(
+        "id, tema_id, enunciado, opcion_a, opcion_b, opcion_c, correcta, justificacion, fuente, created_at, temas!inner(nombre)",
+      )
+      .in("tema_id", temaIds)
+      .range(offset, offset + PAGE - 1);
+    if (error) throw new Error(`getRandomPreguntasByTemas: ${error.message}`);
+    if (!data?.length) break;
+    allRaw.push(...data);
+    if (data.length < PAGE) break;
+  }
 
-  const flat = ((data ?? []) as Array<
+  const flat = (allRaw as Array<
     Pregunta & { temas: { nombre: string } | Array<{ nombre: string }> }
   >).map((row) => {
     const tema = Array.isArray(row.temas) ? row.temas[0] : row.temas;
@@ -478,16 +512,27 @@ export async function getRandomPreguntasByAsignatura(
   n = 20,
 ): Promise<PreguntaConTema[]> {
   const supabase = getSupabaseAdmin();
-  const { data, error } = await supabase
-    .from("preguntas")
-    .select(
-      "id, tema_id, enunciado, opcion_a, opcion_b, opcion_c, correcta, justificacion, fuente, created_at, temas!inner(nombre, asignatura_id)",
-    )
-    .eq("temas.asignatura_id", asignaturaId);
 
-  if (error) throw new Error(`getRandomPreguntasByAsignatura: ${error.message}`);
+  // Paginación manual en chunks de 1000 para sortear el max-rows default de Supabase.
+  // Si una asignatura supera 1000 preguntas, todas entran al barajado en vez de
+  // quedar recortadas silenciosamente.
+  const PAGE = 1000;
+  const allRaw: unknown[] = [];
+  for (let offset = 0; ; offset += PAGE) {
+    const { data, error } = await supabase
+      .from("preguntas")
+      .select(
+        "id, tema_id, enunciado, opcion_a, opcion_b, opcion_c, correcta, justificacion, fuente, created_at, temas!inner(nombre, asignatura_id)",
+      )
+      .eq("temas.asignatura_id", asignaturaId)
+      .range(offset, offset + PAGE - 1);
+    if (error) throw new Error(`getRandomPreguntasByAsignatura: ${error.message}`);
+    if (!data?.length) break;
+    allRaw.push(...data);
+    if (data.length < PAGE) break;
+  }
 
-  const flat = ((data ?? []) as Array<
+  const flat = (allRaw as Array<
     Pregunta & {
       temas:
         | { nombre: string; asignatura_id: string }
