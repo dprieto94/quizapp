@@ -46,6 +46,7 @@ Plataforma personal de exámenes tipo test para preparar un máster universitari
    - `db/04_migracion_8_5.sql` — preguntas configurables, multi-tema, justificación + fuente
    - `db/10_migracion_multi_usuario.sql` — multi-usuario (`tests.user_id`, `config.user_id`)
    - `db/11_migracion_shuffle_seed.sql` — shuffle determinista de opciones por test
+   - `db/13_migracion_examen_real.sql` — columna `examen_real` (marca preguntas de examen/ejemplo real)
 
 5. Crea los usuarios necesarios:
    ```bash

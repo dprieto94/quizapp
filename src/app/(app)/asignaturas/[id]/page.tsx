@@ -1,7 +1,12 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
-import { getAsignatura, getConfig, listTemasByAsignatura } from "@/lib/db";
+import {
+  countPreguntasRealesByAsignatura,
+  getAsignatura,
+  getConfig,
+  listTemasByAsignatura,
+} from "@/lib/db";
 import { StartTestForm } from "./StartTestForm";
 
 type Props = {
@@ -13,10 +18,11 @@ export default async function AsignaturaPage({ params }: Props) {
   const session = await getSession();
   if (!session) redirect("/login");
 
-  const [asignatura, temas, config] = await Promise.all([
+  const [asignatura, temas, config, realesCount] = await Promise.all([
     getAsignatura(id),
     listTemasByAsignatura(id),
     getConfig(session.userId),
+    countPreguntasRealesByAsignatura(id),
   ]);
 
   if (!asignatura) notFound();
@@ -40,6 +46,8 @@ export default async function AsignaturaPage({ params }: Props) {
           timerMinutos={config.timer_minutos}
           penalizacion={config.penalizacion}
           preguntasPorTest={config.preguntas_por_test}
+          tieneExamenReal={realesCount > 0}
+          realesCount={realesCount}
         />
       ) : (
         <div className="rounded-xl border border-border bg-primary-soft p-5">

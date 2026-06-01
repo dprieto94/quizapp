@@ -23,7 +23,12 @@ export default async function EmpezarPage({ params, searchParams }: Props) {
   if (!session) redirect("/login");
 
   const sp = await searchParams;
-  const modalidad: Modalidad = sp.modalidad === "asignatura" ? "asignatura" : "temas";
+  const modalidad: Modalidad =
+    sp.modalidad === "asignatura"
+      ? "asignatura"
+      : sp.modalidad === "reales"
+        ? "reales"
+        : "temas";
   const modo: Modo = sp.modo === "estudio" ? "estudio" : "examen";
   const temaIds: string[] =
     modalidad === "temas" && typeof sp.temas === "string"
@@ -43,16 +48,24 @@ export default async function EmpezarPage({ params, searchParams }: Props) {
   const preguntas =
     modalidad === "temas"
       ? await getRandomPreguntasByTemas(temaIds, config.preguntas_por_test)
-      : await getRandomPreguntasByAsignatura(id, config.preguntas_por_test);
+      : modalidad === "reales"
+        ? await getRandomPreguntasByAsignatura(id, config.preguntas_por_test, {
+            soloReales: true,
+          })
+        : await getRandomPreguntasByAsignatura(id, config.preguntas_por_test);
 
   if (!preguntas.length) {
     return (
       <Card className="mx-auto max-w-2xl">
         <h1 className="text-2xl font-semibold">Aún no hay preguntas disponibles</h1>
         <p className="mt-3 text-muted">
-          No se ha encontrado ninguna pregunta para esta{" "}
-          {modalidad === "temas" ? "selección de temas" : "asignatura"}.
-          Añade preguntas desde el admin y vuelve a intentarlo.
+          No se ha encontrado ninguna pregunta para{" "}
+          {modalidad === "temas"
+            ? "esta selección de temas"
+            : modalidad === "reales"
+              ? "el examen real de esta asignatura"
+              : "esta asignatura"}
+          . Añade preguntas desde el admin y vuelve a intentarlo.
         </p>
         <div className="mt-6 flex flex-col gap-3 sm:flex-row">
           <Link

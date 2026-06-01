@@ -1,5 +1,5 @@
 export type Modo = "examen" | "estudio";
-export type Modalidad = "temas" | "asignatura";
+export type Modalidad = "temas" | "asignatura" | "reales";
 export type Opcion = "a" | "b" | "c";
 
 export type User = {
@@ -123,6 +123,7 @@ export type CreateTestWithRespuestasInput = Omit<Test, "id" | "fecha"> & {
 
 export type CorrectaPregunta = Pick<Pregunta, "id" | "tema_id" | "correcta"> & {
   asignatura_id: string;
+  examen_real: boolean;
 };
 
 export type TestRespuestaDetalle = TestRespuesta & {

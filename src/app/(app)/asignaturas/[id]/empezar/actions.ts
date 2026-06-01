@@ -22,7 +22,7 @@ const payloadSchema = z.object({
   asignaturaId: z.string().uuid(),
   temaIds: z.array(z.string().uuid()).max(50),
   modo: z.enum(["examen", "estudio"]),
-  modalidad: z.enum(["temas", "asignatura"]),
+  modalidad: z.enum(["temas", "asignatura", "reales"]),
   testSeed: z.string().uuid(),
   respuestas: z.array(respuestaSchema).min(1).max(30),
 });
@@ -60,6 +60,9 @@ export async function finalizarTest(input: unknown) {
     }
     if (modalidad === "temas" && !allowedTemaIds.has(pregunta.tema_id)) {
       throw new Error("Pregunta fuera de los temas seleccionados");
+    }
+    if (modalidad === "reales" && !pregunta.examen_real) {
+      throw new Error("Pregunta fuera del pool de examen real");
     }
 
     // La letra correcta tras el shuffle aplicado al renderizar el test —

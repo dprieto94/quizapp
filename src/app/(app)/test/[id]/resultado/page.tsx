@@ -74,7 +74,9 @@ export default async function ResultadoPage({ params }: Props) {
       ? test.temas.length === 1
         ? test.temas[0].nombre
         : `${test.temas.length} temas`
-      : "Asignatura completa";
+      : test.modalidad === "reales"
+        ? "Examen real"
+        : "Asignatura completa";
 
   return (
     <div className="space-y-6">
