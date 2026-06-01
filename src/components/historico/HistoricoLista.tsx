@@ -20,6 +20,7 @@ function formatFecha(iso: string) {
 
 function formatTemas(test: TestListaItem) {
   if (test.modalidad === "asignatura") return "Completa";
+  if (test.modalidad === "reales") return "Examen real";
   if (test.temas.length === 0) return "—";
   if (test.temas.length === 1) return test.temas[0].nombre;
   return `${test.temas.length} temas`;

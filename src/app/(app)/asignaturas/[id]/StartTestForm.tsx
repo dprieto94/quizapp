@@ -12,6 +12,8 @@ type Props = {
   timerMinutos: number;
   penalizacion: number;
   preguntasPorTest: number;
+  tieneExamenReal: boolean;
+  realesCount: number;
 };
 
 const radioCard =
@@ -23,9 +25,13 @@ export function StartTestForm({
   timerMinutos,
   penalizacion,
   preguntasPorTest,
+  tieneExamenReal,
+  realesCount,
 }: Props) {
   const router = useRouter();
-  const [modalidad, setModalidad] = useState<"temas" | "asignatura">("temas");
+  const [modalidad, setModalidad] = useState<"temas" | "asignatura" | "reales">(
+    "temas",
+  );
   const [modo, setModo] = useState<"examen" | "estudio">("examen");
   const [selectedTemas, setSelectedTemas] = useState<Set<string>>(
     () => new Set(temas.length ? [temas[0].id] : []),
@@ -65,7 +71,11 @@ export function StartTestForm({
     <form onSubmit={submit} className="space-y-6">
       <Card>
         <h2 className="text-lg font-semibold">Modalidad</h2>
-        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <div
+          className={`mt-4 grid gap-3 ${
+            tieneExamenReal ? "sm:grid-cols-3" : "sm:grid-cols-2"
+          }`}
+        >
           <label className={radioCard}>
             <input
               type="radio"
@@ -96,6 +106,23 @@ export function StartTestForm({
               </span>
             </span>
           </label>
+          {tieneExamenReal ? (
+            <label className={radioCard}>
+              <input
+                type="radio"
+                name="modalidad"
+                value="reales"
+                checked={modalidad === "reales"}
+                onChange={() => setModalidad("reales")}
+              />
+              <span>
+                <strong>Examen real</strong>
+                <span className="mt-1 block text-sm text-muted">
+                  Solo preguntas de exámenes reales ({realesCount} disponibles).
+                </span>
+              </span>
+            </label>
+          ) : null}
         </div>
 
         {modalidad === "temas" ? (

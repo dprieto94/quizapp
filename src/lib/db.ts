@@ -406,6 +406,7 @@ export async function getRandomPreguntasByTemas(
 export async function getRandomPreguntasByAsignatura(
   asignaturaId: string,
   n = 20,
+  opts: { soloReales?: boolean } = {},
 ): Promise<PreguntaConTema[]> {
   const supabase = getSupabaseAdmin();
 
@@ -415,13 +416,16 @@ export async function getRandomPreguntasByAsignatura(
   const PAGE = 1000;
   const allRaw: unknown[] = [];
   for (let offset = 0; ; offset += PAGE) {
-    const { data, error } = await supabase
+    let query = supabase
       .from("preguntas")
       .select(
         "id, tema_id, enunciado, opcion_a, opcion_b, opcion_c, correcta, justificacion, fuente, created_at, temas!inner(nombre, asignatura_id)",
       )
-      .eq("temas.asignatura_id", asignaturaId)
-      .range(offset, offset + PAGE - 1);
+      .eq("temas.asignatura_id", asignaturaId);
+    // Modalidad "examen real" (Fase 13): la pool se restringe a las preguntas
+    // marcadas con examen_real = true.
+    if (opts.soloReales) query = query.eq("examen_real", true);
+    const { data, error } = await query.range(offset, offset + PAGE - 1);
     if (error) throw new Error(`getRandomPreguntasByAsignatura: ${error.message}`);
     if (!data?.length) break;
     allRaw.push(...data);
@@ -454,6 +458,24 @@ export async function getRandomPreguntasByAsignatura(
   return shuffled(flat).slice(0, n);
 }
 
+/**
+ * Nº de preguntas con examen_real = true en una asignatura. Sirve para decidir
+ * si se ofrece la modalidad "Examen real" (Fase 13) en la pantalla de preparar
+ * test (solo se muestra en asignaturas con al menos una pregunta real).
+ */
+export async function countPreguntasRealesByAsignatura(
+  asignaturaId: string,
+): Promise<number> {
+  const supabase = getSupabaseAdmin();
+  const { count, error } = await supabase
+    .from("preguntas")
+    .select("id, temas!inner(asignatura_id)", { count: "exact", head: true })
+    .eq("temas.asignatura_id", asignaturaId)
+    .eq("examen_real", true);
+  if (error) throw new Error(`countPreguntasRealesByAsignatura: ${error.message}`);
+  return count ?? 0;
+}
+
 export async function getCorrectasByPreguntaIds(
   ids: string[],
 ): Promise<CorrectaPregunta[]> {
@@ -461,7 +483,7 @@ export async function getCorrectasByPreguntaIds(
   const supabase = getSupabaseAdmin();
   const { data, error } = await supabase
     .from("preguntas")
-    .select("id, tema_id, correcta, temas!inner(asignatura_id)")
+    .select("id, tema_id, correcta, examen_real, temas!inner(asignatura_id)")
     .in("id", ids);
 
   if (error) throw new Error(`getCorrectasByPreguntaIds: ${error.message}`);
@@ -470,6 +492,7 @@ export async function getCorrectasByPreguntaIds(
     id: string;
     tema_id: string;
     correcta: CorrectaPregunta["correcta"];
+    examen_real: boolean | null;
     temas: { asignatura_id: string } | Array<{ asignatura_id: string }>;
   }>).map((row) => {
     const tema = Array.isArray(row.temas) ? row.temas[0] : row.temas;
@@ -478,6 +501,7 @@ export async function getCorrectasByPreguntaIds(
       tema_id: row.tema_id,
       correcta: row.correcta,
       asignatura_id: tema?.asignatura_id ?? "",
+      examen_real: row.examen_real ?? false,
     };
   });
 }
