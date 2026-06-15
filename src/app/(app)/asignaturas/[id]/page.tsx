@@ -1,5 +1,7 @@
+import { Gamepad2 } from "lucide-react";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { Card } from "@/components/ui/Card";
 import { getSession } from "@/lib/auth";
 import {
   countPreguntasRealesByAsignatura,
@@ -40,15 +42,34 @@ export default async function AsignaturaPage({ params }: Props) {
       </div>
 
       {temas.length ? (
-        <StartTestForm
-          asignatura={asignatura}
-          temas={temas}
-          timerMinutos={config.timer_minutos}
-          penalizacion={config.penalizacion}
-          preguntasPorTest={config.preguntas_por_test}
-          tieneExamenReal={realesCount > 0}
-          realesCount={realesCount}
-        />
+        <>
+          <Link
+            href={`/asignaturas/${asignatura.id}/juego`}
+            className="block"
+          >
+            <Card className="flex items-center gap-4 transition-shadow hover:shadow-md">
+              <span className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-primary-soft text-primary">
+                <Gamepad2 className="size-6" aria-hidden="true" />
+              </span>
+              <div>
+                <h2 className="font-semibold">Modo Juego</h2>
+                <p className="text-sm text-muted">
+                  Supervivencia: acierta para seguir, falla y pierde una vida.
+                  Compite por el récord.
+                </p>
+              </div>
+            </Card>
+          </Link>
+          <StartTestForm
+            asignatura={asignatura}
+            temas={temas}
+            timerMinutos={config.timer_minutos}
+            penalizacion={config.penalizacion}
+            preguntasPorTest={config.preguntas_por_test}
+            tieneExamenReal={realesCount > 0}
+            realesCount={realesCount}
+          />
+        </>
       ) : (
         <div className="rounded-xl border border-border bg-primary-soft p-5">
           <h2 className="font-semibold text-primary">No hay temas en esta asignatura</h2>

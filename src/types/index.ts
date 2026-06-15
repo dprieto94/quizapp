@@ -174,3 +174,23 @@ export type TestEvolucionPunto = {
   asignatura_nombre: string;
   modalidad: Modalidad;
 };
+
+// --- Modo Juego (Fase 14) ---
+
+// Pool jugable en Modo Juego: subconjunto de Modalidad (nunca 'temas').
+export type JuegoModalidad = Extract<Modalidad, "asignatura" | "reales">;
+
+export type JuegoRecord = {
+  id: string;
+  asignatura_id: string;
+  user_id: string | null;
+  nombre: string;
+  aciertos: number;
+  vidas_iniciales: number;
+  modalidad: JuegoModalidad;
+  es_fake: boolean;
+  premio: string | null;
+  fecha: string | null;
+};
+
+export type NewJuegoRecord = Omit<JuegoRecord, "id" | "fecha">;

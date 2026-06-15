@@ -22,9 +22,11 @@ import type {
   ConfigUpdate,
   CorrectaPregunta,
   CreateTestWithRespuestasInput,
+  JuegoRecord,
   MediaPorAsignaturaItem,
   Modalidad,
   Modo,
+  NewJuegoRecord,
   NewPregunta,
   Pregunta,
   PreguntaConTema,
@@ -816,4 +818,96 @@ export async function getEvolucionExamen(
       };
     })
     .reverse();
+}
+
+// --- Modo Juego (Fase 14) ---
+
+/**
+ * Clasificación de una asignatura: top N por aciertos (desempate por antigüedad).
+ * COMPARTIDA entre usuarios (no se filtra por user_id) y separada por asignatura.
+ */
+export async function getRankingJuego(
+  asignaturaId: string,
+  limit = 10,
+): Promise<JuegoRecord[]> {
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from("juego_records")
+    .select(
+      "id, asignatura_id, user_id, nombre, aciertos, vidas_iniciales, modalidad, es_fake, premio, fecha",
+    )
+    .eq("asignatura_id", asignaturaId)
+    .order("aciertos", { ascending: false })
+    .order("fecha", { ascending: true })
+    .limit(limit);
+
+  if (error) throw new Error(`getRankingJuego: ${error.message}`);
+  return (data ?? []) as JuegoRecord[];
+}
+
+/**
+ * El record-con-premio de una asignatura: su umbral (aciertos) y el texto del
+ * premio. Hoy solo existe en la asignatura 1 (Anna). null si no hay premio.
+ */
+export async function getPremioJuego(
+  asignaturaId: string,
+): Promise<{ threshold: number; premio: string } | null> {
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from("juego_records")
+    .select("aciertos, premio")
+    .eq("asignatura_id", asignaturaId)
+    .not("premio", "is", null)
+    .order("aciertos", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw new Error(`getPremioJuego: ${error.message}`);
+  if (!data || !data.premio) return null;
+  return { threshold: data.aciertos, premio: data.premio };
+}
+
+/**
+ * Nº de records REALES (no fake) por encima de un umbral. Sirve para decidir si
+ * el premio está desbloqueado (> 0 ⇒ alguien superó el récord de referencia).
+ */
+export async function countRecordsRealesPorEncima(
+  asignaturaId: string,
+  threshold: number,
+): Promise<number> {
+  const supabase = getSupabaseAdmin();
+  const { count, error } = await supabase
+    .from("juego_records")
+    .select("id", { count: "exact", head: true })
+    .eq("asignatura_id", asignaturaId)
+    .eq("es_fake", false)
+    .gt("aciertos", threshold);
+
+  if (error) throw new Error(`countRecordsRealesPorEncima: ${error.message}`);
+  return count ?? 0;
+}
+
+/**
+ * Posición (1-indexada) que ocuparía una puntuación en la clasificación de la
+ * asignatura: nº de records estrictamente mejores + 1.
+ */
+export async function getPosicionJuego(
+  asignaturaId: string,
+  aciertos: number,
+): Promise<number> {
+  const supabase = getSupabaseAdmin();
+  const { count, error } = await supabase
+    .from("juego_records")
+    .select("id", { count: "exact", head: true })
+    .eq("asignatura_id", asignaturaId)
+    .gt("aciertos", aciertos);
+
+  if (error) throw new Error(`getPosicionJuego: ${error.message}`);
+  return (count ?? 0) + 1;
+}
+
+export async function insertRecordJuego(payload: NewJuegoRecord): Promise<void> {
+  const supabase = getSupabaseAdmin();
+  const { error } = await supabase.from("juego_records").insert(payload);
+  if (error) throw new Error(`insertRecordJuego: ${error.message}`);
 }
