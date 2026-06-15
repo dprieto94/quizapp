@@ -1,6 +1,6 @@
 # QuizApp
 
-Plataforma personal de exámenes tipo test para preparar un máster universitario. Uso privado, multi-usuario aislado: cada cuenta tiene su propio histórico, estadísticas y configuración. Banco de preguntas compartido.
+Plataforma personal de exámenes tipo test para preparar un máster universitario. Uso privado, multi-usuario aislado: cada cuenta tiene su propio histórico, estadísticas y configuración. Banco de preguntas compartido. Incluye un **Modo Juego** de supervivencia con clasificación por asignatura.
 
 ## Stack
 
@@ -47,6 +47,8 @@ Plataforma personal de exámenes tipo test para preparar un máster universitari
    - `db/10_migracion_multi_usuario.sql` — multi-usuario (`tests.user_id`, `config.user_id`)
    - `db/11_migracion_shuffle_seed.sql` — shuffle determinista de opciones por test
    - `db/13_migracion_examen_real.sql` — columna `examen_real` (marca preguntas de examen/ejemplo real)
+   - `db/15_migracion_modalidad_reales.sql` — modalidad de test "examen real"
+   - `db/22_migracion_modo_juego.sql` — Modo Juego: tabla `juego_records` (clasificación por asignatura)
 
 5. Crea los usuarios necesarios:
    ```bash
@@ -90,6 +92,7 @@ src/
 │   ├── (app)/                               Rutas protegidas (proxy.ts redirige a /login si no hay sesión)
 │   │   ├── page.tsx                         Home: lista de asignaturas con counts
 │   │   ├── asignaturas/[id]/                Configurar test (modalidad, modo, temas)
+│   │   ├── asignaturas/[id]/juego/          Modo Juego: clasificación, selección y partida (GameRunner)
 │   │   ├── test/[id]/resultado/             Resultado de un test (hero + lista expandible)
 │   │   ├── historico/                       Listado filtrable + estadísticas con gráficas
 │   │   ├── configuracion/                   Editar penalización, timer y preguntas por test

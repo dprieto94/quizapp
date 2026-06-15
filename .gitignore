@@ -37,6 +37,9 @@ yarn-error.log*
 # local-only seeds (datos reales)
 db/*.local.sql
 
+# records fake del Modo Juego: contienen el texto del premio (sorpresa) — fuera del repo
+db/23_seed_juego_records_fake.sql
+
 # local-only data exports (datos reales)
 db/*.local.json
 db/_correccion/
