@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "seed:user": "tsx --env-file=.env.local scripts/seed-user.ts",
+    "export:preguntas": "tsx --env-file=.env.local scripts/export-preguntas.ts",
     "test:scoring": "node --import tsx --test scripts/test-scoring.ts"
   },
   "dependencies": {
