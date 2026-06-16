@@ -1,8 +1,10 @@
 "use client";
 
-import { Check, Heart, X } from "lucide-react";
+import { Heart } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
+import { QuestionCard } from "@/components/test/QuestionCard";
+import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { cn } from "@/lib/cn";
 import type { CorrectasMap, JuegoModalidad, Opcion, PreguntaPublica } from "@/types";
@@ -16,14 +18,6 @@ type Props = {
   preguntas: PreguntaPublica[];
   correctas: CorrectasMap;
 };
-
-const REVEAL_MS = 900;
-
-const opciones: Array<{ key: Opcion; label: string }> = [
-  { key: "a", label: "A" },
-  { key: "b", label: "B" },
-  { key: "c", label: "C" },
-];
 
 export function GameRunner({
   asignaturaId,
@@ -44,58 +38,42 @@ export function GameRunner({
 
   const pregunta = preguntas[index];
   const correcta = pregunta ? correctas[pregunta.id] : undefined;
+  const revealed = seleccion !== null;
 
-  // Tras un breve reveal de acierto/fallo, avanza o termina la partida.
-  useEffect(() => {
-    if (seleccion === null || fin) return;
-    const acerto = seleccion === correcta;
-    const timer = setTimeout(() => {
-      const nuevasVidas = acerto ? vidas : vidas - 1;
-      const nuevosAciertos = acerto ? aciertos + 1 : aciertos;
-      setVidas(nuevasVidas);
-      setAciertos(nuevosAciertos);
+  // Al responder se fija la opción (dispara el reveal y, si se falla, el panel de
+  // justificación de QuestionCard) y se aplica la consecuencia: suma o resta vida.
+  function handleSelect(opcion: Opcion) {
+    if (revealed) return;
+    setSeleccion(opcion);
+    if (opcion === correcta) setAciertos((a) => a + 1);
+    else setVidas((v) => v - 1);
+  }
 
-      const motivo =
-        nuevasVidas <= 0
-          ? "sin-vidas"
-          : index + 1 >= total
-            ? "completada"
-            : null;
+  // ¿La respuesta ya contestada termina la partida? (vidas/aciertos ya actualizados).
+  const partidaTermina = revealed && (vidas <= 0 || index + 1 >= total);
 
-      if (motivo) {
-        setFin(motivo);
-        if (!savedRef.current) {
-          savedRef.current = true;
-          startTransition(async () => {
-            const r = await guardarRecordJuego({
-              asignaturaId,
-              modalidad,
-              vidas: vidasIniciales,
-              aciertos: nuevosAciertos,
-            });
-            setResultado(r);
-          });
-        }
-      } else {
-        setIndex(index + 1);
-        setSeleccion(null);
-      }
-    }, REVEAL_MS);
-
-    return () => clearTimeout(timer);
-  }, [
-    seleccion,
-    fin,
-    correcta,
-    vidas,
-    aciertos,
-    index,
-    total,
-    asignaturaId,
-    modalidad,
-    vidasIniciales,
-    startTransition,
-  ]);
+  // "Continuar": avanza a la siguiente o, si la partida termina, muestra el
+  // resultado y guarda el récord una sola vez.
+  function handleContinuar() {
+    if (!partidaTermina) {
+      setIndex((i) => i + 1);
+      setSeleccion(null);
+      return;
+    }
+    setFin(vidas <= 0 ? "sin-vidas" : "completada");
+    if (!savedRef.current) {
+      savedRef.current = true;
+      startTransition(async () => {
+        const r = await guardarRecordJuego({
+          asignaturaId,
+          modalidad,
+          vidas: vidasIniciales,
+          aciertos,
+        });
+        setResultado(r);
+      });
+    }
+  }
 
   if (fin) {
     return (
@@ -154,8 +132,6 @@ export function GameRunner({
 
   if (!pregunta) return null;
 
-  const revealed = seleccion !== null;
-
   return (
     <div className="mx-auto max-w-3xl">
       <header className="sticky top-0 z-10 -mx-4 flex items-center justify-between gap-3 border-b border-border bg-background/95 px-4 py-3 backdrop-blur">
@@ -176,62 +152,30 @@ export function GameRunner({
         </div>
       </header>
 
-      <section className="mt-6 rounded-xl border border-border bg-background p-5 shadow-sm">
-        <h2 className="text-lg font-semibold leading-relaxed">{pregunta.enunciado}</h2>
+      <div className="mt-6">
+        <QuestionCard
+          pregunta={pregunta}
+          seleccionada={seleccion}
+          correcta={correcta}
+          onSelect={handleSelect}
+        />
+      </div>
 
-        <div className="mt-6 space-y-3">
-          {opciones.map((opcion) => {
-            const isSelected = seleccion === opcion.key;
-            const esCorrecta = revealed && correcta === opcion.key;
-            const esMarcadaIncorrecta =
-              revealed && isSelected && correcta !== opcion.key;
-            const esAtenuada = revealed && !esCorrecta && !esMarcadaIncorrecta;
-            return (
-              <button
-                key={opcion.key}
-                type="button"
-                onClick={() => {
-                  if (!revealed) setSeleccion(opcion.key);
-                }}
-                disabled={revealed}
-                className={cn(
-                  "flex min-h-14 w-full items-center gap-3 rounded-xl border px-4 py-3 text-left transition-colors",
-                  "focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2",
-                  esCorrecta && "border-success bg-primary-soft text-success",
-                  esMarcadaIncorrecta && "border-danger bg-danger/10 text-danger",
-                  esAtenuada && "border-border opacity-60",
-                  !revealed && "border-border bg-background hover:bg-primary-soft",
-                  revealed && "cursor-default",
-                )}
-              >
-                <span
-                  className={cn(
-                    "flex size-8 shrink-0 items-center justify-center rounded-full border text-sm font-semibold",
-                    esCorrecta
-                      ? "border-success bg-success text-white"
-                      : esMarcadaIncorrecta
-                        ? "border-danger bg-danger text-white"
-                        : "border-border text-muted",
-                  )}
-                >
-                  {esCorrecta ? (
-                    <Check className="size-4" />
-                  ) : esMarcadaIncorrecta ? (
-                    <X className="size-4" />
-                  ) : (
-                    opcion.label
-                  )}
-                </span>
-                <span className="flex-1">{pregunta[`opcion_${opcion.key}`]}</span>
-              </button>
-            );
-          })}
-        </div>
-      </section>
-
-      <p className="mt-4 text-center text-xs text-muted">
-        Acierta para seguir. Si fallas, pierdes una vida.
-      </p>
+      <div className="mt-5 flex justify-center">
+        {revealed ? (
+          <Button
+            type="button"
+            onClick={handleContinuar}
+            className="w-full sm:w-auto sm:min-w-48"
+          >
+            {partidaTermina ? "Ver resultado" : "Continuar"}
+          </Button>
+        ) : (
+          <p className="text-center text-xs text-muted">
+            Acierta para seguir. Si fallas, pierdes una vida.
+          </p>
+        )}
+      </div>
     </div>
   );
 }
