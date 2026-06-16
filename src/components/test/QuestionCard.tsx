@@ -9,10 +9,10 @@ import type { Opcion, PreguntaPublica } from "@/types";
 type Props = {
   pregunta: PreguntaPublica;
   seleccionada: Opcion | null;
-  dudosa: boolean;
+  dudosa?: boolean;
   correcta?: Opcion;
   onSelect: (opcion: Opcion) => void;
-  onToggleDudosa: () => void;
+  onToggleDudosa?: () => void;
 };
 
 const opciones: Array<{ key: Opcion; label: string }> = [
@@ -36,16 +36,18 @@ export function QuestionCard({
     <section className="rounded-xl border border-border bg-background p-5 shadow-sm">
       <div className="flex items-start justify-between gap-4">
         <h2 className="text-lg font-semibold leading-relaxed">{pregunta.enunciado}</h2>
-        <Button
-          type="button"
-          variant={dudosa ? "secondary" : "ghost"}
-          size="sm"
-          onClick={onToggleDudosa}
-          aria-pressed={dudosa}
-          aria-label={dudosa ? "Quitar marca de dudosa" : "Marcar como dudosa"}
-        >
-          <Bookmark className={cn("size-4", dudosa ? "fill-primary" : "")} />
-        </Button>
+        {onToggleDudosa ? (
+          <Button
+            type="button"
+            variant={dudosa ? "secondary" : "ghost"}
+            size="sm"
+            onClick={onToggleDudosa}
+            aria-pressed={dudosa}
+            aria-label={dudosa ? "Quitar marca de dudosa" : "Marcar como dudosa"}
+          >
+            <Bookmark className={cn("size-4", dudosa ? "fill-primary" : "")} />
+          </Button>
+        ) : null}
       </div>
 
       <div className="mt-6 space-y-3">
